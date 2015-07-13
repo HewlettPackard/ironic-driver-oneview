@@ -1,0 +1,23 @@
+[ironic]
+default_deploy_kernel_id=<your deploy kernel id>
+default_deploy_ramdisk_id=<your deploy ramdisk id>
+default_sync_driver=<default driver which will synchronize the nodes[fake_oneview_driver, pxe_oneview]>
+
+[keystone_authtoken]
+admin_password=<your keystone password>
+admin_tenant_name=<your keystone tenant name>
+admin_user=<your keystone user>
+auth_uri=<your keystone url authentication>
+
+[nova]
+username=<your nova user name>
+user_pass=<your nova password>
+user_tenant=<your nova tenant name>
+
+
+[oneview]
+manager_url=<your oneview url>
+username=<your oneview user name>
+password=<your oneview password>
+allow_insecure_connections=<default option to secure connection[true/false]>
+tls_cacert_file=<path to a ca certificate valid[optional if allow_insecure_connections is true]>

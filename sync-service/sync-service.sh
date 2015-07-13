@@ -1,0 +1,1 @@
+python manage_ironic_nodes.py
