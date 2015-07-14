@@ -213,7 +213,7 @@ class OneViewServerHardwareAPI(OneViewRequestAPI):
         return {'name': server_hardware["name"],
                 'cpus': vcpus,
                 'memory_mb': server_hardware["memoryMb"],
-                'local_gb': 500,
+                'local_gb': 120,
                 'server_hardware_uri': server_hardware["uri"],
                 'server_hardware_type_uri':
                     server_hardware["serverHardwareTypeUri"],
