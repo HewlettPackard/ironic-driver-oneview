@@ -57,7 +57,7 @@ opts = [
                default=None,
                help='Path to CA certificate'),
     cfg.IntOpt('max_retries',
-               default=20,
+               default=100,
                help='Max connection retries to check changes on OneView'),
 ]
 
@@ -104,6 +104,7 @@ def check_request_status(response):
 
     if status in (409,):
         LOG.debug("Conflict contacting OneView: ", response.json())
+        time.sleep(10)
         repeat = True
     elif status in (404, 500):
         LOG.error(_LE("Error contacting OneView: "), response.json())
@@ -142,7 +143,8 @@ def log_insecure_connection():
 
 # --- Authentication ---
 @check_config_options
-def prepare_and_do_request(uri, body={}, request_type='GET'):
+def prepare_and_do_request(uri, body={}, request_type='GET',
+                           max_retries=CONF.oneview.max_retries):
     json_response = {}
     try:
         LOG.info(_LI("Using OneView credentials specified in ironic.conf"))
@@ -163,7 +165,8 @@ def prepare_and_do_request(uri, body={}, request_type='GET'):
         verify_status = get_verify_connection_option()
 
         repeat = True
-        while repeat:
+        retries = 0
+        while repeat and (retries < max_retries):
             if request_type == 'PUT':
                 ret = requests.put(url,
                                    data=body,
@@ -184,6 +187,7 @@ def prepare_and_do_request(uri, body={}, request_type='GET'):
                                    verify=verify_status)
 
             repeat = check_request_status(ret)
+            retries += 1
 
         json_response = ret.json()
     except requests.RequestException as error_message:
@@ -294,7 +298,7 @@ def set_node_power_state(driver_info, state, press_type='MomentaryPress'):
     while current_state not in [POWER_STATE_ONEVIEW_TO_IRONIC.get(state)]:
         if current_state is states.ERROR:
             raise exception.OneViewErrorStateSettingPowerState()
-        time.sleep(5)
+        time.sleep(10)
         current_state = get_node_power_state(driver_info)
 
     return get_node_power_state(driver_info)
@@ -469,7 +473,7 @@ def clone_and_assign(driver_info, server_profile_template_uri, instance_uuid,
             retries += 1
             LOG.debug("Server profile isn't applied yet. Retrying... (%s)"
                       % retries)
-            time.sleep(5)
+            time.sleep(10)
             isAssigned = (get_server_hardware(driver_info).get('state') ==
                           'ProfileApplied')
         if not isAssigned:
