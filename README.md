@@ -92,6 +92,9 @@ Now in the *ironic_drivers* source directory run:
 bash update_stack_with_oneview_driver.sh
 ```
 
+Note: If you have installed Ironic using apt-get, the Ironic path probably will
+be */usr/lib/python{your python version}/dist-packages/ironic*
+
 ### Adding the driver to setup.cfg
 
 The *setup.cfg* file in Ironic still needs to be edited to include our driver.
@@ -110,6 +113,16 @@ drivers to Ironic's environment:
 
 ```
 sudo python setup.py install
+```
+
+If you have installed Ironic from apt-get, it'll not have a *setup.cfg* file on the source
+directory to add the driver to. You have to add the two entry lines below to the section
+[ironic.drivers] from *entry_points.txt*, which can be found in
+*/usr/lib/python{your python version}/dist-packages/ironic-2015.1.0.egg-info*:
+
+```
+fake_oneview = ironic.drivers.oneview:FakeOneViewDriver
+pxe_oneview = ironic.drivers.oneview:OneViewDriver
 ```
 
 ### Configuring ironic.conf
@@ -317,19 +330,19 @@ glance image-list
 ## Creating flavors
 
 The process of creating Nova flavors based on OneView's SPTs is automated by
-the `ov-flavor` script.
+the *ov-flavor* script.
 
 In order to run the script, you can use environment variables or use command
 line parameters.
 
-To use environment variables, if you have an `openrc` file to your cloud (if
+To use environment variables, if you have an *openrc* file to your cloud (if
 you're using Devstack, there is one in its source directory), run:
 
 ```
 source openrc $OS_USERNAME $OS_TENANT_NAME
 ```
 
-If you don't have an `openrc` file, you'll need to set the following Openstack
+If you don't have an *openrc* file, you'll need to set the following Openstack
 variables:
 
 ```
@@ -363,7 +376,7 @@ bash ov-flavor.sh --os-tenant-name <your-openstack-tenant-name> --os-username <y
 You should now be able to see the possible flavors to be created and a
 prompt asking for the id of the flavor you want to create. The next step is to
 choose the name of the flavor which can either be customised or the default
-suggested by `ov-flavor`.
+suggested by *ov-flavor*.
 
 Press *Enter* and, if everything goes well, your flavor will be shown when
 running:
@@ -409,7 +422,7 @@ tls_cacert_file = /my/cacert/path/if/any
 Besides the ones described above, two other sections need to be edited to
 contain your Openstack credentials, which are the [keystone_authtoken] and
 [nova] sections. Configure these sections in the same way it's configured on
-ironic.conf and nova.conf.
+*ironic.conf* and *nova.conf*.
 
 Now, with these options configured, go to the *sync-service* directory and run:
 
