@@ -1,5 +1,15 @@
 # HP OneView driver for Ironic
 
+This is a preview of the Ironic drivers for OneView, targeting the Kilo
+version of Ironic.
+
+The code in this repository is not maintained anymore as these drivers
+have been merged into Ironic's repository. Please, look at Ironic docs and
+repository for the latest version of the drivers.
+
+* http://docs.openstack.org/developer/ironic/drivers/oneview.html
+* https://github.com/openstack/ironic
+
 ## Introduction
 
 [HP OneView][1] is a single integrated platform, packaged as an appliance that
