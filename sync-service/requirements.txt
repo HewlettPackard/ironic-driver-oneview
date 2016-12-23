@@ -1,4 +1,0 @@
-pika>=0.9.14
-python-keystoneclient
-python-ironicclient
-python-novaclient

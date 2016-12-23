@@ -1,469 +1,566 @@
-# HP OneView driver for Ironic
+# HPE OneView drivers for Ironic
 
-This is a preview of the Ironic drivers for OneView, targeting the Kilo
-version of Ironic.
+## OpenStack Ironic integration
 
-The code in this repository is not maintained anymore as these drivers
-have been merged into Ironic's repository. Please, look at Ironic docs and
-repository for the latest version of the drivers.
+HPE OneView is a single integrated platform that implements a software-defined
+approach to manage physical infrastructure environments. Besides all that, HPE
+OneView also exposes a RESTful API that allows operators and developers to
+build custom workloads to best fit their needs.
 
-* http://docs.openstack.org/developer/ironic/drivers/oneview.html
-* https://github.com/openstack/ironic
+Due special requirements e.g. high performance needs, cloud providers may want
+to provide bare metal servers to their customers instead of virtual machines.
+In the OpenStack ecosystem, the component responsible for provisioning bare
+metal machines is named Ironic. In the most basic scenario, Ironic achieves
+this goal communicating with other three main OpenStack components: i) `Nova`
+compute service; ii) `Glance` image service; and iii) `Neutron` networking
+service.
 
-## Introduction
+The integration of management systems, such as HPE OneView, is made possible in
+Ironic through the implementation of drivers. This way, OneView drivers
+implements well defined interfaces in Ironic and uses OneView RESTful API to
+execute actions that will be performed in the physical machines. For example,
+the drivers use OneView RESTful API when powering machine on/off and rebooting;
+changing boot device; and when creating and removing a *Server Profile*.
 
-[HP OneView][1] is a single integrated platform, packaged as an appliance that
-implements a software-defined approach to manage physical infrastructure. The
-appliance supports scenarios such as deploying bare metal servers and
-hypervisor clusters from bare metal servers, for instance. In this context,
-the *HP OneView driver* for Ironic integrates them both and enables the users
-of OneView to use Ironic as a bare metal provider to their managed physical
-hardware.
+Currently HPE has two drivers that allows cloud providers to deploy bare metal
+instances using OneView, the `agent_pxe_oneview` and `iscsi_pxe_oneview`. Both
+drivers use Preboot eXecution Environment (PXE) technology for boot and differs
+only in the technology used for deploying the instance as detailed in this
+documentation.
 
-The driver implements the [core interfaces of an Ironic Driver][2] and uses
-the [OneView Rest API][3] to provide communication between Ironic and
-OneView.
+### Agent PXE OneView driver
 
-In order to provide a better user experience, the driver offers additional
-features when managing bare metal servers together with OneView:
-* Automated Nova flavor creation based on OneView resources
-* Automatic Ironic node inventory synchronization with OneView
-* Handling of Ironic nodes that are in use by other OneView users
-* Instance deployment using PXE
+The deployment process can be broken down into three phases as explained below.
 
-These features include external services that communicate with our driver and
-the OneView appliance in order to provide a synchronization mechanism to
-automatically synchronize Ironic nodes and OneView managed hardware.
+Firstly, the `Server Hardware` will be allocated to Ironic. Once the operator
+configures the bare metal node to use `agent_pxe_oneview` driver and Ironic
+gets a request to deploy an image on it, the driver checks if the node is free
+for use by Ironic and applies a `Server Profile` created based on a given
+`Server Profile Template` at OneView.
 
-What not to expect from the current driver:
-* As Ironic only supports the use of flat networks on Kilo, don't expect to use
-tenant networks on the deployed nodes
-* Server storage is assumed to be consistent among all OneView based servers,
-don't expect variance in physical storage to effect Ironic node scheduling
+The next step is to download the deploy images with `Ironic Python Agent (IPA)`
+embedded. The driver then sets the bare metal node to boot from `PXE`,
+configures network options for this node at Neutron and power on the node,
+triggering `PXE` boot. Then the node downloads the deploy images through
+`Trivial File Transfer Protocol (TFTP)` according to the configuration provided
+by the `Dynamic Host Configuration Protocol (DHCP)` server.
 
-To provide a bare metal instance the agents involved in the process are three:
-* Ironic service
-* OneView appliance
-* OneView driver
+Finally, once the node is powered on, the IPA at the node downloads the user
+images from Ironic via `HTTP` and writes it to disk. After this operation is
+finished, Ironic sets the bare metal node to boot from `disk`, change the
+network configuration at Neutron if needed and reboot it, finishing the
+instance deployment.
 
-The role of Ironic is to serve as a bare metal provider to OneView's managed
-physical hardware and to provide communication with other necessary OpenStack
-services such as Nova and Glance. When Ironic receives a boot request coming
-from Nova, it works together with the OneView driver to access a machine in
-OneView, the driver being responsible for the communication with the OneView
-appliance.
+### iSCSI PXE OneView driver
 
-Once the deployment process starts, the deployment interface of the driver is
-called by the *Ironic Conductor*, and then the driver is in charge of preparing
-the selected Server Hardware object, the entity in OneView that represents a
-machine, so that it can enter in the PXE process. After the driver preparation,
-the Server Hardware enters in the [PXE process][4], and from that point the
-machine communicates with the [TFTP][5] server to access the images to be
-deployed and restarts twice in order to install the user image. When the machine
-finishes this process, the OpenStack user will have SSH access to the machine
-(attention to the use of a cloud-init script to provide credentials).
+The deployment process using `iscsi_pxe_oneview` driver can be described in the
+same way the `agent_pxe_oneview` driver was above.
 
-## Installation
+Firstly, the `Server Hardware` will be allocated to Ironic. Once the operator
+configures the bare metal node to use `iscsi_pxe_oneview` driver and Ironic
+gets a request to deploy an image on it, the driver checks if the node is free
+for use by Ironic and applies a `Server Profile` created based on a given
+`Server Profile Template` at OneView.
 
-In this tech preview we aim to support the Kilo version of Ironic. For new
-installs of Ironic in a running Openstack Kilo cloud, follow
-[these instructions][11].
+The next step is to download the deploy images containing `IPA`. The driver
+then sets the bare metal node to boot from `PXE`, configures `DHCP` options
+for this node at Neutron and power on the node, triggering the download of the
+deploy images through `TFTP` according to the configuration provided by the
+`DHCP` server.
 
-If you want to test the driver in a Devstack setup with Ironic enabled,
-follow [these instructions][6] to clone it and configure it (bear in mind that,
-for testing purposes, you can leave some services such as Horizon enabled).
-**Don't forget to checkout to the stable Kilo branch in your Devstack before
-stacking.**
+Once the node is powered on, the `IPA` informs Ironic to continue the
+deployment. Ironic then wipes out the disk of the node and writes the user
+image. After this operation is finished, Ironic configures the node boot loader
+partition, sets the bare metal node to boot from `disk`, reboot it and change
+the network configuration at Neutron if needed, finishing the instance
+deployment.
 
-```
-#In the devstack/ source directory
+### Requirements
+* HPE OneView
+  * HPE OneView 2.0
+  * HPE OneView 3.0
 
-git checkout stable/kilo
-bash stack.sh
-```
-The next step is to clone the OneView driver:
+* HPE Blade Lines:
+  * BL 460c Gen 8 (Tested)
+  * BL 460c Gen 9  (Tested)
+  * BL 465c Gen 8 (Tested)
+  * BL 660c Gen 8
+  * BL 660c Gen 9
 
-```
-git clone https://git.lsd.ufcg.edu.br/ironicdrivers/ironic_drivers.git
-```
 
-Once the driver is cloned, in order to add the OneView driver code to Ironic's
-code base, first set the following variables to the paths to your Ironic and
-OneView driver directories:
+* HPE Density Lines (requires iLO 4 with Redfish):
+  * DL 360 Gen 9 (Tested)
+  * DL 360e Gen 8
+  * DL 360e Gen 9
+  * DL 360p Gen 8
+  * DL 360p Gen 9
 
-```
-REPOSITORY_HOME=<path to the driver repository>
-IRONIC_HOME=<path to your existing Ironic>
-```
+## OpenStack Ansible
 
-Now in the *ironic_drivers* source directory run:
+Teams of operators spend so much time and effort to setup, tuning and
+maintaining OpenStack cloud environments and automating that workflow became a
+hot topic in the OpenStack community. Automation engines like TripleO, Salt,
+Chef, Puppet and Ansible started to be used and well adopted by the community
+to automate the OpenStack deployment workflow.
 
-```
-bash update_stack_with_oneview_driver.sh
-```
+For this documentation the OpenStack Ansible, also known as OSA, was chosen and
+the process of OpenStack deployment is fully described below.
 
-Note: If you have installed Ironic using apt-get, the Ironic path probably will
-be */usr/lib/python{your python version}/dist-packages/ironic*
+### Install
 
-### Adding the driver to setup.cfg
+Copy your SSH key to the server where the OpenStack will be deployed.
 
-The *setup.cfg* file in Ironic still needs to be edited to include our driver.
-Add the two entry lines below to *setup.cfg* in the Ironic source directory:
-
-```
-fake_oneview = ironic.drivers.oneview:FakeOneViewDriver
-pxe_oneview = ironic.drivers.oneview:OneViewDriver
-```
-
-The *pxe_oneview* driver uses PXE for deployment whilst *fake_oneview* is a
-fake driver, used for testing purposes.
-
-After that, still in the Ironic source directory, execute *setup.py* to add the
-drivers to Ironic's environment:
-
-```
-sudo python setup.py install
+```bash
+ssh-copy-id USER@SERVER_IP
 ```
 
-If you have installed Ironic from apt-get, it'll not have a *setup.cfg* file on the source
-directory to add the driver to. You have to add the two entry lines below to the section
-[ironic.drivers] from *entry_points.txt*, which can be found in
-*/usr/lib/python{your python version}/dist-packages/ironic-2015.1.0.egg-info*:
+Then, access the server:
 
-```
-fake_oneview = ironic.drivers.oneview:FakeOneViewDriver
-pxe_oneview = ironic.drivers.oneview:OneViewDriver
+```bash
+ssh USER@SERVER_IP
 ```
 
-### Configuring ironic.conf
+Update package lists from the repositories:
 
-In */etc/ironic/ironic.conf*, add the driver to the *enabled_drivers* tag:
-
-```
-enabled_drivers = pxe_oneview
+```bash
+apt-get update
 ```
 
-Now, in order to provide the credentials to access the OneView appliance,
-add a [oneview] section to *ironic.conf* with the following fields
+Install dependencies:
 
-```
-[oneview]
-
-manager_url = https://my.oneview.com
-username = my_username
-password = my_password
-allow_insecure_connections = false
-tls_cacert_file = /my/cacert/path/if/any
-max_retries = 20
+```bash
+apt-get install -y git build-essential openssh-server \
+  python-dev python-virtualenv virtualenv openvswitch-switch
 ```
 
-* manager_url: refers to the address of the OneView appliance;
-* username and password: the OneView credentials the driver is going to use;
-* allow_insecure_connections: leave this *true* if you want the driver not to
-validate the certificate provided by OneView in the TLS connection;
-* tls_cacert_file: path to the CA certificate file; if blank, the system's
-trust store will be used to validate certificates in secure connections;
-* max_retries: max connection retries the driver uses to check if changes
-occurred on OneView
+Clone OpenStack Ansible project:
+```bash
+git clone https://github.com/openstack/openstack-ansible.git \
+    /opt/openstack-ansible
+```
 
-Finally, **restart the ironic-conductor service** and you should have
-Ironic ready to use our *pxe_oneview* driver.
+Install Ansible:
 
-In Openstack:
+```bash
+source /opt/openstack-ansible/scripts/bootstrap-ansible.sh
+```
+
+Edit Ansible Bootstrap file /opt/openstack-ansible/tests/bootstrap-aio.yml:
+
+```yaml
+- name: Bootstrap the All-In-One (AIO)
+  hosts: localhost
+  user: root
+  roles:
+    - role: "sshd"
+    - role: "pip_install"
+    - role: "bootstrap-host"
+      openstack_confd_entries: "{{ confd_overrides[scenario] }}"
+      scenario: "{{ lookup('env','SCENARIO') | default('aio', true) }}"
+      confd_overrides:
+        aio:
+          - name: glance.yml.aio
+          - name: horizon.yml.aio
+          - name: keystone.yml.aio
+          - name: ironic.yml.aio
+          - name: neutron.yml.aio
+          - name: nova.yml.aio
+          - name: swift.yml.aio
+```
+
+Run the pre-installation script:
 
 ```
+source /opt/openstack-ansible/scripts/bootstrap-aio.sh
+```
+
+Modify the default passwords in `/etc/openstack_deploy/user_secrets.yml`.
+
+Deploy the OpenStack cloud environment:
+
+```bash
+source /opt/openstack-ansible/scripts/run-playbooks.sh
+```
+
+> Note: The deployment will take about 90 minutes.
+
+
+## Configuration
+
+
+### Neutron configuration
+
+Once the OpenStack deployment is fully complete the next step is to configure
+the network. OSA creates by default four bridges. The management bridge is
+responsible for connecting all containers in the installation and also makes
+possible ironic nodes to reach DHCP and then TFTP services running in the
+neutron and ironic conductor respectively.
+
+Turn the deploy interface up:
+
+```bash
+ip link set $CONTROLLER_DEPLOY_INTERFACE up
+```
+
+Add the deploy interface to the management bridge:
+
+```bash
+brctl addif br-mgmt $CONTROLLER_DEPLOY_INTERFACE
+```
+
+Find the `br-mgmt` bridge gateway:
+
+```bash
+ifconfig br-mgmt
+```
+
+Create an environment variable to store the `br-mgmt` bridge gateway:
+
+```bash
+GATEWAY_IP = $MANAGEMENT_BRIDGE_IP
+```
+
+Find an available IPs interval to be allocated to the nodes requesting DHCP:
+
+```bash
+lxc-ls -f
+```
+> Note: look at the IPs used by all containers and find an available IP
+interval.
+
+Store the start and end interval:
+
+```bash
+START_POOL_IP = $START_IP
+END_POOL_IP = $END_IP
+```
+
+Attach to the container:
+
+```bash
+lxc-attach -n aio1_utility_container
+```
+
+Load the credentials:
+
+```bash
+source /root/openrc
+```
+
+Create the `flat` network:
+
+```bash
+openstack network create \
+  --provider-physical-network flat \
+  --provider-network-type flat \
+  $FLAT_NETWORK_NAME
+```
+
+Create the subnet:
+
+```bash
+openstack subnet create \
+  --network $FLAT_NETWORK_NAME_OR_UUID \
+  --allocation-pool start=$START_POOL_IP,end=$END_POOL_IP \
+  --gateway $GATEWAY_IP \
+  --subnet-range $MANAGEMENT_MASK_IN_CIDR_FORMAT \
+  $SUBNET_NAME
+```
+
+### Ironic configuration
+
+Attach to the container:
+
+```bash
+lxc-attach -n aio1_utility_container
+```
+
+List and copy the network uuid:
+
+```bash
+openstack network list
+```
+
+Attach to the ironic conductor container:
+
+```bash
+lxc-attach -n aio1_ironic_conductor_container
+```
+
+In the section `[DEFAULT]` edit enabled drivers like this:
+
+```
+enabled_drivers = agent_pxe_oneview,iscsi_pxe_oneview
+
+```
+
+In the section` [conductor]` edit automated clean like this:
+
+```
+automated_clean = True
+```
+
+In the section `[neutron]` edit cleaning network pasting the network `uuid`:
+
+```
+cleaning_network = $NETWORK_NAME_OR_UUID
+```
+
+In the section `[oneview]` edit the variables like this:
+
+```
+manager_url = $ONEVIEW_MANAGER_URL
+username = $ONEVIEW_USERNAME
+password = $ONEVIEW_PASSWORD
+allow_insecure_connections = $ALLOW_INSECURE_CONNECTIONS
+tls_cacert_file = $TLS_CACERT_FILE
+max_polling_attempts = $MAX_POLLING_ATTEMPTS
+```
+
+Load the ironic-conductor virtual environment:
+
+```bash
+source /openstack/venvs/ironic-master/bin/activate
+```
+
+Install the python-oneviewclient in the virtual environment:
+
+```bash
+pip install python-oneviewclient
+```
+
+Restart the ironic conductor service:
+
+```bash
 service ironic-conductor restart
 ```
 
-In Devstack:
+> Note: Write zeros in the whole disk sometimes is undesired time consuming
+task. If want to disable this behavior edit the erase device priority variables
+in section `[deploy]` as: `erase_device_priority = 0`
 
-```
-# Go to the devstack source directory
+## Launching an instance
 
-bash rejoin-stack.sh
+Since there is a node in `available` state in ironic, an instance can be
+requested to nova compute service. It can be done through `horizon` web
+interface or via OpenStack command line interface:
 
-# (Ctrl+a ") to change the screen
-# Navigate to ir-cond (ironic-conductor service)
-# (Ctrl+c) to stop the service
-# (Up arrow, Enter) to restart the service
-```
-
-## Networking
-
-For the sake of example, we assume that the network connecting Ironic and the
-Enclosure has its configuration as shown in Figure 1.
-
-![network](doc/images/network_layout.png?raw=true)
-
-Figure 1. Example of a suitable network layout
-
-Since Ironic currently only supports flat networks, all Server Profile
-Templates must be configured so the first NIC is connected to the same network
-and this network shall have an uplink port to the network where the
-ironic-conductor is running (if it's not running from a blade in the same
-enclosure).
-
-To enable the flat network to be used in the deployment process, first, create
-the following OpenVSwitch bridge and port:
-
-```
-sudo ovs-vsctl add-br br-em1
-sudo ovs-vsctl add-port br-em1 em1
+```bash
+openstack server create \
+  --image $USER_IMAGE_NAME_OR_UUID \
+  --flavor $FLAVOR_NAME_OR_UUID \
+  --nic net-id=$FLAT_NETWORK_NAME_OR_UUID \
+  $SERVER_NAME
 ```
 
-Next, configure the *Neutron ML2 plugin* following the Step 1 of this
-[guide][7].
+## Optional tools
 
-You can now create and configure a *Neutron flat network* and its *subnet*,
-both of which will be associated to an instance at deploy time.
+There are two tools to assist the creation and management of nodes using HPE
+OneView drivers, the ironic-oneview-cli and ironic-oneviewd.
 
-```
-TENANT_ID=<your-tenant-id>
-FLAT_NET_NAME=<name-of-your-flat-net>
+Install the operating system dependencies:
 
-neutron net-create --tenant-id $TENANT_ID $FLAT_NET_NAME --shared --provider:network_type flat --provider:physical_network physnet1
-
-SUBNET_NAME=<name-of-your-subnet>
-
-neutron subnet-create $FLAT_NET_NAME 192.168.2.0/24 --name $SUBNET_NAME --ip-version=4 --gateway=192.168.2.1 --enable-dhcp
-```
-
-To check if your network was successfully created in *Neutron*, run:
+```bash
+apt-get install -y python-pip build-essential python-dev
 
 ```
-neutron net-list
+Install the pip dependencies:
+
+```bash
+pip install setuptools wheel
 ```
 
-Now, add the network IP and its subnet mask to the bridge br-em1 created
-previously:
+> Note: If the `pip.conf` file in the machine has some customizations,
+installing packages through pip may not work. If so, remove or rename the file
+to ensure pip can reach the PyPi index.
 
-```
-sudo ip addr add 192.168.2.1/24 dev br-em1
-```
+### Ironic OneView CLI
 
-This way you are stating that all instances with this range of IPs belong to
-this network.
+Ironic-OneView CLI is a command line interface tool for easing the use of the
+OneView Drivers for Ironic. It allows the user to easily create and configure
+Ironic nodes compatible with OneView Server Hardware objects and create Nova
+flavors to match Ironic nodes that use OneView drivers.
 
-Finally, **ensure [Ubuntu's Uncomplicated Firewall][12] is disabled** in order
-to allow TFTP traffic and, therefore, perform a proper deployment:
+#### Install
 
-```
-sudo ufw disable
-```
+Attach to the container:
 
-## Deploying
-
-### Server Profiles in OneView
-
-*Server Profiles* are logical entities that capture key aspects of a server
-configuration, enabling the OneView users to provision converged hardware
-infrastructure quickly and consistently. Information such as the type of
-hardware the Server Profile is associated to, boot settings, BIOS/UEFI
-settings, firmware configuration and network connections are encapsulated in
-this entity.
-
-*Server Profile Templates* (SPT) are Server Profiles not assigned to any Server
-Hardware. At deploy time, they are cloned and assigned to a specific Server
-Hardware.
-
-In our scenario, Nova flavors are created based on SPTs and their
-configurations. These SPTs in OneView must be configured according to the
-following guidelines:
-
-* Firmware: should be set to *Managed manually* in order to save time when
-applying a Server Profile to a Server Hardware;
-* Connections: flat network connecting the devices to a single switch;
-* Physical MAC address: when applying a Server Profile to a Server Hardware a
-physical MAC address needs to be provided since Ironic must know this
-info prior to a Server Profile assignment; Also, the first NIC (Network
-Interface Card) of an SPT should be always in the same network as
-the machine with the Ironic service.
-
-![server-profile](doc/images/ov_server_profile.png?raw=true)
-
-Figure 2. Example of a Server Profile Template in OneView
-
-### Creating deploy and user images
-
-In order to create suitable images for bare metal provisioning, deploy and
-user images, we suggest the use of [disk-image-builder][8].
-
-To create kernel and ramdisk deploy images, run:
-
-```
-DEPLOY_IMAGES_NAME=<name-of-your-images>
-
-ramdisk-image-create ubuntu deploy-ironic -o $DEPLOY_IMAGES_NAME
+```bash
+lxc-attach -n aio1_utility_container
 ```
 
-This will generate a *.kernel* and a *.initramfs* files which you should now
-add to *Glance*, as follows
+Install the Ironic OneView CLI:
 
-```
-glance image-create --name <name-of-your-kernel-image> --is-public True --disk-format aki < $DEPLOY_IMAGES_NAME.kernel
-
-glance image-create --name <name-of-your-ramdisk-image> --is-public True --disk-format ari < $DEPLOY_IMAGES_NAME.initramfs
+```bash
+pip install ironic-oneview-cli
 ```
 
-Now, create the user image to be deployed
+#### Configuring credentials
 
-```
-USER_IMAGES_NAME=<name-of-your-user-images>
+Some initial configuration are needed before to use the tool and the first step
+to achieve that is create and initialization file.
 
-DIB_CLOUD_INIT_DATASOURCES="ConfigDrive, OpenStack" disk-image-create -o $USER_IMAGES_NAME ubuntu baremetal dhcp-all-interfaces
-```
+To create the initialization file do:
 
-The *DIB_CLOUD_INIT_DATASOURCES* parameter ensures all cloud-init
-configuration is going to be applied to the deployed instance, including user
-and password credentials, public key authentication and many other possible
-[config options][9].
-
-This will generate a *.initrd*, *.vmlinuz* and *.qcow2* files which will be
-used to form your final user image when adding it to *Glance*, as follows
-
-```
-glance image-create --name <your-user-image-kernel-name> --is-public True --disk-format aki  < $USER_IMAGES_NAME.vmlinuz
-USER_KERNEL_UUID=<id-of-kernel-image>
-
-glance image-create --name <your-user-image-ramdisk-name> --is-public True --disk-format ari  < $USER_IMAGES_NAME.initrd
-USER_RAMDISK_UUID=<id-of-ramdisk-image>
-
-glance image-create --name <your-user-image-name> --is-public True --disk-format qcow2 --container-format bare --property kernel_id=$USER_KERNEL_UUID --property ramdisk_id=$USER_RAMDISK_UUID < $USER_IMAGES_NAME.qcow2
+```bash
+ironic-oneview genrc > ironic-oneviewrc.sh
 ```
 
-To check if your images were successfully added to *Glance*, run:
+Open the `ironic-oneviewrc.sh` file and edit the needed fields.
 
-```
-glance image-list
-```
+Load the file to export the environment variables:
 
-## Creating flavors
-
-The process of creating Nova flavors based on OneView's SPTs is automated by
-the *ov-flavor* script.
-
-In order to run the script, you can use environment variables or use command
-line parameters.
-
-To use environment variables, if you have an *openrc* file to your cloud (if
-you're using Devstack, there is one in its source directory), run:
-
-```
-source openrc $OS_USERNAME $OS_TENANT_NAME
+```bash
+source ironic-oneviewrc.sh
 ```
 
-If you don't have an *openrc* file, you'll need to set the following Openstack
-variables:
+Load OpenStack `openrc` credential file:
 
-```
-OS_TENANT_NAME=<your-openstack-tenant-name>
-OS_USERNAME=<your-openstack-username>
-OS_PASSWORD=<your-openstack-password>
-OS_AUTH_URL=<your-openstack-keystone-v2-api-url>
+```bash
+source /root/openrc
 ```
 
-Then, set the credentials to access the OneView appliance:
+#### Node creation
 
-```
-OV_USERNAME=<your-oneview-username>
-OV_PASSWORD=<your-oneview-password>
-OV_ADDRESS=<https://your.oneview.address>
-```
+The process of creating a node is interactive. Firstly, ironic-oneview-cli show
+the list of available `Server Profile Templates` to the user to be chosen. Once
+it does, the tool will show a list of nodes that match the
+`Server Profile Template` chosen in the previous step. It is possible to choose
+multiple nodes to be enrolled at once.
 
-Go to *ironic_drivers/shell* and, if the credentials above are correctly set,
-only run
+Attach to the container:
 
-```
-bash ov-flavor.sh create-flavors
-```
-
-However, if you want to run it with inline parameters, run:
-
-```
-bash ov-flavor.sh --os-tenant-name <your-openstack-tenant-name> --os-username <your-openstack-username> --os-password <your-openstack-password> --os-auth-url <your-openstack-auth-url> --ov-username <your-oneview-username> --ov-password <your-oneview-password> --ov-address <https://your.oneview.address>
+```bash
+lxc-attach -n aio1_utility_container
 ```
 
-You should now be able to see the possible flavors to be created and a
-prompt asking for the id of the flavor you want to create. The next step is to
-choose the name of the flavor which can either be customised or the default
-suggested by *ov-flavor*.
+Create the node:
 
-Press *Enter* and, if everything goes well, your flavor will be shown when
-running:
-
-```
-$ nova flavor-list
-+--------------------------------------+-----------------------------------------------+-----------+------+-----------+------+-------+-------------+-----------+
-| ID                                   | Name                                          | Memory_MB | Disk | Ephemeral | Swap | VCPUs | RXTX_Factor | Is_Public |
-+--------------------------------------+-----------------------------------------------+-----------+------+-----------+------+-------+-------------+-----------+
-| 3ec7b46d-a5c0-4d8a-8fe6-baf75b6e3228 | ServerProfile7-Demo-32768MB-RAM_12_x86_64_120 | 32768     | 120  | 0         |      | 12    | 1.0         | True      |
-+--------------------------------------+-----------------------------------------------+-----------+------+-----------+------+-------+-------------+-----------+
+```bash
+ironic-oneview node-create
 ```
 
-## Creating nodes
+> Note: The tool has an `--insecure` option to skip SSL certificate validation.
 
-The process of creating, removing and putting Ironic nodes in maintenance mode
-based on OneView Server Hardware objects is automatically performed by the
-sync-service. OneView's [RabbitMQ][10] message bus is used to listen to events,
-such as added and deleted Server Hardware objects. The sync-service processes
-these events and takes the corresponding actions on Ironic.
+The created nodes can be seen doing:
 
-### Configuring sync.conf
-
-Copy the *ironic_drivers/sync-service/sync.conf.sample* as
-*ironic_drivers/sync-service/sync.conf*  and configure it as follows:
-
-```
-[ironic]
-
-default_deploy_kernel_id = <your-deploy-kernel-image-id>
-default_deploy_ramdisk_id = <your-deploy-ramdisk-image-id>
-default_sync_driver = pxe_oneview
-
-[oneview]
-
-manager_url = https://my.oneview.com
-username = my_username
-password = my_password
-allow_insecure_connections = false
-tls_cacert_file = /my/cacert/path/if/any
+```bash
+openstack baremetal node list
 ```
 
-Besides the ones described above, two other sections need to be edited to
-contain your Openstack credentials, which are the [keystone_authtoken] and
-[nova] sections. Configure these sections in the same way it's configured on
-*ironic.conf* and *nova.conf*.
+#### Flavor creation
 
-Now, with these options configured, go to the *sync-service* directory and run:
+The process of creating a flavor is also interactive. The user will be prompted
+with a list of `Server Profile Template` for the nodes registered in Ironic.
+Different of creating a node, where a list of all the
+`Server Profile Templates` in OneView are shown, the `Server Profile Template`
+shown when creating a flavor are the ones that match the nodes already created.
 
+The information about disk, memory, cpus and processor architecture within the
+template are used to create the flavor. The user will only be asked to choose
+the `Server Profile Template` and a name for the flavor. To start the process
+of creating a flavor, run:
+
+Attach to the container:
+
+```bash
+lxc-attach -n aio1_utility_container
 ```
-bash sync-service.sh
+
+Create the flavor:
+```
+ironic-oneview flavor-create
 ```
 
-The service should now be up and running, synchronizing Ironic's inventory
-with the events from OneView, which includes creating, removing and putting
-nodes in maintenance mode if in use by other OneView users.
+The created flavor can be seen doing:
 
-[1]: http://www8.hp.com/us/en/business-solutions/converged-systems/oneview.html
+```bash
+openstack flavor list
+```
 
-[2]: http://docs.openstack.org/developer/ironic/dev/architecture.html#drivers
+### Ironic OneView Daemon
 
-[3]: http://h17007.www1.hp.com/docs/enterprise/servers/oneviewhelp/oneviewRESTAPI/content/images/api/index.html
+The ironic-oneviewd is a python daemon of the OneView Driver for Ironic. It
+handles nodes in `enroll` and `manageable` provision states in ironic,
+preparing them to become `available`. In order to be moved from `enroll` to
+`available`, a `Server Profile` must be applied to the `Server Hardware`
+represented by a node according to its `Server Profile Template`. This daemon
+monitors ironic nodes and applies a `Server Profile` to such `Server Hardware`.
 
-[4]: http://en.wikipedia.org/wiki/Preboot_Execution_Environment
+#### Install
 
-[5]: http://pt.wikipedia.org/wiki/Trivial_File_Transfer_Protocol
+Attach to the container:
 
-[6]: http://docs.openstack.org/developer/ironic/dev/dev-quickstart.html#deploying-ironic-with-devstack
+```bash
+lxc-attach -n aio1_ironic_conductor_container
+```
 
-[7]: http://docs.openstack.org/developer/ironic/deploy/install-guide.html#configure-neutron-to-communicate-with-the-bare-metal-server
+Install the Ironic OneView Daemon:
 
-[8]: https://github.com/openstack/diskimage-builder
+```bash
+pip install ironic-oneviewd
+```
 
-[9]: http://cloudinit.readthedocs.org/en/latest/topics/examples.html
+#### Configuring credentials
 
-[10]: https://www.rabbitmq.com/
+Some initial configuration are needed before to use the tool and the first step
+to achieve that is to edit the configuration file.
 
-[11]: http://docs.openstack.org/developer/ironic/deploy/install-guide.html
+Edit the `/etc/ironic-oneviewd/ironic-oneviewd.conf.sample` accordingly.
 
-[12]: https://help.ubuntu.com/community/UFW
+Rename the file to `ironic-oneviewd.conf`:
+
+```bash
+mv /etc/ironic-oneviewd/ironic-oneviewd.conf.sample \
+  /etc/ironic-oneviewd/ironic-oneviewd.conf
+```
+
+#### Starting the daemon
+
+Start the daemon:
+
+```bash
+ironic-oneviewd
+```
+
+## Glossary
+
+* Blade Line (BL): HPE ProLiant enclosure-based server models.
+
+* Density Line (DL): HPE ProLiant rack-based server models.
+
+* Dynamic Host Configuration Protocol (DHCP): stands for, a protocol to provide
+network configuration such as IP, subnet mask and default gateway, in a
+client/server fashion.
+
+* Hypertext Transfer Protocol (HTTP): application protocol for World Wide Web.
+
+* Integrated Lights-Out (iLO): proprietary embedded server management
+technology by HPE which provides out-of-band management facilities
+(e.g. power on/off, reset, mount image).
+
+* Ironic Python Agent (IPA): An agent for controlling and deploying Ironic
+controlled baremetal nodes.
+
+* Pre eXecution Environment (PXE): is a standardized environment that runs a
+assembly software that permits boot by NIC.
+
+* Server Profile (SP): Server Hardware configuration entity including firmware
+baseline, BIOS settings, network connectivity, boot configuration, Integrated
+Lights-Out (iLO) settings, and unique IDs.
+
+* Server Profile Template (SPT): Template for creation of Server Profiles.
+
+* Trivial File Transfer Protocol (TFTP): is a utility to transfer files using
+FTP generally in early stages of boot when user authentication is not required.
+
+* OpenStack Ansible (OSA): is an official OpenStack project which aims to
+deploy production environments from source in a way that makes it scalable
+while also being simple to operate, upgrade, and grow.
+
+* Secure Shell (SSH): is a cryptographic network protocol for operating network
+services securely over an unsecured network. The best known example application
+is for remote login to computer systems by users.
+
+* Secure Sockets Layer (SSL): is a cryptographic protocol that provide
+communications security over a computer network.

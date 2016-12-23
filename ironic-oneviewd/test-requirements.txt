@@ -1,0 +1,18 @@
+bumpversion==0.5.3
+wheel==0.23.0
+watchdog==0.8.3
+flake8==2.4.1
+tox==2.1.1
+coverage==4.0
+Sphinx==1.3.1
+cryptography==1.4
+PyYAML==3.11
+discover
+python-subunit>=0.0.18 # Apache-2.0/BSD
+oslosphinx>=2.5.0 # Apache-2.0
+oslotest>=1.10.0 # Apache-2.0
+
+testrepository>=0.0.18 # Apache-2.0/BSD
+testscenarios>=0.4 # Apache-2.0/BSD
+testtools>=1.4.0 # MIT
+mock>=2.0 # BSD

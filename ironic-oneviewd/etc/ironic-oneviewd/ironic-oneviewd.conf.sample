@@ -1,0 +1,137 @@
+[DEFAULT]
+
+#
+# From ironic-oneviewd
+#
+
+# Polling interval in seconds for daemon to manage the nodes.
+# (integer value)
+#retry_interval = 300
+
+# Size the of the RPC thread pool. (integer value)
+#rpc_thread_pool_size = 20
+
+
+[oneview]
+
+#
+# From ironic-oneviewd
+#
+
+# URL where OneView is available. (string value)
+#manager_url = <None>
+
+# OneView username to be used. (string value)
+#username = <None>
+
+# OneView password to be used. (string value)
+#password = <None>
+
+# Option to allow insecure connection with OneView. (boolean
+# value)
+#allow_insecure_connections = false
+
+# (Optional) Path to CA certificate. (string value)
+#tls_cacert_file = <None>
+
+# Max connection retries to check changes on OneView. (integer
+# value)
+#max_polling_attempts = 12
+
+# (Optional) Whether to enable the periodic tasks for OneView
+# driver be aware when OneView hardware resources are taken
+# and released by Ironic or OneView users and proactively
+# manage nodes in clean fail state according to Dynamic
+# Allocation model of hardware resources allocation in
+# OneView. (boolean value)
+#enable_periodic_tasks = true
+
+# Period (in seconds) for periodic tasks to be executed when
+# enable_periodic_tasks is True. (integer value)
+#periodic_check_interval = 300
+
+# (Optional) Enable auditing of OneView API requests. (boolean
+# value)
+#audit_enabled = false
+
+# Path to map file for OneView audit cases. Used only when
+# OneView API audit is enabled. See:
+# https://github.com/openstack/python-oneviewclient (string
+# value)
+#audit_map_file = <None>
+
+# Path to OneView audit log file. Created only when Oneview
+# API audit is enabled. (string value)
+#audit_output_file = <None>
+
+
+[openstack]
+
+#
+# From ironic-oneviewd
+#
+
+# Authentication URL for OpenStack services. (string value)
+#auth_url = <None>
+
+# Name of the OpenStack user. (string value)
+#username = <None>
+
+# OpenStack user password. (string value)
+#password = <None>
+
+# Name of the OpenStack Keystone region. (string value)
+#region_name = <None>
+
+# Allow insecure SSL (no cert verification). (boolean value)
+#insecure = false
+
+# (Optional) Path to CA certificate bundle file. (string
+# value)
+#cacert = <None>
+
+# (Optional) Path to cert file. (string value)
+#cert = <None>
+
+# Ironic deploy kernel image uuid. (string value)
+#deploy_kernel_id = <None>
+
+# Ironic deploy remdisk image uuid. (string value)
+#deploy_ramdisk_id = <None>
+
+# (Optional) OpenStack endpoint type. (string value)
+#endpoint_type = publicURL
+
+# Ironic OneView driver for node create.  (string value)
+# Allowed values: iscsi_pxe_oneview, agent_pxe_oneview, fake_oneview
+#ironic_driver = <None>
+
+# ID of the OpenStack tenant. (deprecated in favour of
+# project_id) (string value)
+#tenant_id = <None>
+
+# Name of the OpenStack tenant. (deprecated in favour of
+# project_name) (string value)
+#tenant_name = <None>
+
+# ID of the OpenStack project. (string value)
+#project_id = <None>
+
+# Name of the OpenStack project. (string value)
+#project_name = <None>
+
+# ID of a domain the user belongs to. (string value)
+#user_domain_id = <None>
+
+# Name of a domain the user belongs to. (string value)
+#user_domain_name = <None>
+
+# ID of a domain the project belongs to. (string value)
+#project_domain_id = <None>
+
+# ID of a domain the project belongs to. (string value)
+#project_domain_name = <None>
+
+# Run inspection on nodes when any hardware property is
+# missing. (boolean value)
+#inspection_enabled = false
