@@ -1,6 +1,4 @@
-# -*- encoding: utf-8 -*-
-#
-# (c) Copyright 2015 Hewlett Packard Enterprise Development LP
+# Copyright 2015 Hewlett Packard Development Company, LP
 # Copyright 2015 Universidade Federal de Campina Grande
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -18,42 +16,70 @@
 """
 OneView Driver and supporting meta-classes.
 """
+from oslo_utils import importutils
 
+from ironic.common import exception
+from ironic.common.i18n import _
 from ironic.drivers import base
+from ironic.drivers.modules.oneview import common
 from ironic.drivers.modules.oneview import deploy
+from ironic.drivers.modules.oneview import inspect
 from ironic.drivers.modules.oneview import management
-from ironic.drivers.modules.oneview import oneview_client
 from ironic.drivers.modules.oneview import power
 from ironic.drivers.modules import pxe
 
 
-class OneViewDriver(base.BaseDriver):
-    """PXE + OneView driver.
+class AgentPXEOneViewDriver(base.BaseDriver):
+    """OneViewDriver using OneViewClient interface.
 
-    NOTE: This driver is meant only for testing environments.
-
-    This driver implements the `core` functionality, combining
-    :class:`ironic.drivers.ov.OVPower` for power on/off and reboot of virtual
-    machines, with :class:`ironic.driver.pxe.PXE` for image
-    deployment. Implementations are in those respective classes; this class is
-    merely the glue between them.
+    This driver implements the `core` functionality using
+    :class:ironic.drivers.modules.oneview.power.OneViewPower for power
+    management. And
+    :class:ironic.drivers.modules.oneview.deploy.OneViewAgentDeploy for deploy.
     """
 
     def __init__(self):
-        self.power = power.OneViewPower()
-        self.deploy = deploy.OneViewDeploy()
-        self.management = management.OneViewManagement()
-        self.vendor = pxe.VendorPassthru()
-        oneview_client.check_oneview_status()
+        if not importutils.try_import('oneview_client.client'):
+            raise exception.DriverLoadError(
+                driver=self.__class__.__name__,
+                reason=_("Unable to import python-oneviewclient library"))
+
+        # Checks connectivity to OneView and version compatibility on driver
+        # initialization
+        oneview_client = common.get_oneview_client()
         oneview_client.verify_oneview_version()
+        oneview_client.verify_credentials()
+        self.power = power.OneViewPower()
+        self.management = management.OneViewManagement()
+        self.boot = pxe.PXEBoot()
+        self.deploy = deploy.OneViewAgentDeploy()
+        self.inspect = inspect.OneViewInspect.create_if_enabled(
+            'AgentPXEOneViewDriver')
 
 
-class FakeOneViewDriver(base.BaseDriver):
-    """Fake OneView driver."""
+class ISCSIPXEOneViewDriver(base.BaseDriver):
+    """OneViewDriver using OneViewClient interface.
+
+    This driver implements the `core` functionality using
+    :class:ironic.drivers.modules.oneview.power.OneViewPower for power
+    management. And
+    :class:ironic.drivers.modules.oneview.deploy.OneViewIscsiDeploy for deploy.
+    """
 
     def __init__(self):
-        self.power = power.OneViewPower()
-        self.deploy = deploy.FakeOneViewDeploy()
-        self.management = management.OneViewManagement()
-        oneview_client.check_oneview_status()
+        if not importutils.try_import('oneview_client.client'):
+            raise exception.DriverLoadError(
+                driver=self.__class__.__name__,
+                reason=_("Unable to import python-oneviewclient library"))
+
+        # Checks connectivity to OneView and version compatibility on driver
+        # initialization
+        oneview_client = common.get_oneview_client()
         oneview_client.verify_oneview_version()
+        oneview_client.verify_credentials()
+        self.power = power.OneViewPower()
+        self.management = management.OneViewManagement()
+        self.boot = pxe.PXEBoot()
+        self.deploy = deploy.OneViewIscsiDeploy()
+        self.inspect = inspect.OneViewInspect.create_if_enabled(
+            'ISCSIPXEOneViewDriver')
