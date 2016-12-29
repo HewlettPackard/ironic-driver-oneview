@@ -523,6 +523,14 @@ Start the daemon:
 ironic-oneviewd
 ```
 
+## OneView ML2 Mechanism driver for Ironic-Neutron integration
+
+Ironic can be used together with Neutron to allow Layer 2 networking isolation
+between the physical machines when running OpenStack instances. To use OneView
+as the means to configure the networking in this context, please refer to the
+OneView ML2 Mechanism Driver for Neutron and its documentation that can be
+found in the `networking-oneview` directory of this repository.
+
 ## Glossary
 
 * Blade Line (BL): HPE ProLiant enclosure-based server models.
