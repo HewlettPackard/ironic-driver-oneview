@@ -293,6 +293,24 @@ POOL_OF_STUB_SERVER_HARDWARE = [
         memory_mb=16384,
         port_map=[],
         mp_host_info={}
+    ),
+    stubs.StubServerHardware(
+        name='RackServer',
+        uuid='33333333-7777-8888-9999-111111',
+        uri='/rest/server-hardware/44444',
+        power_state='Off',
+        server_profile_uri='',
+        server_hardware_type_uri='/rest/server-hardware-types/111111222223333',
+        enclosure_group_uri=None,
+        status='OK',
+        state='Unknown',
+        state_reason='',
+        enclosure_uri=None,
+        processor_count=12,
+        processor_core_count=12,
+        memory_mb=16384,
+        port_map=[],
+        mp_host_info={}
     )
 ]
 
@@ -378,6 +396,7 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
             ),
             all=False,
             server_profile_template_name=None,
+            use_oneview_ml2_driver=False,
             number=None,
             nodes=None
         )
@@ -404,31 +423,77 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
 
         selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
         selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
-        attrs = {
-            'driver': STUB_PARAMETERS.os_ironic_node_driver,
-            'driver_info': {
-                'dynamic_allocation': True,
-                'deploy_kernel': STUB_PARAMETERS.os_ironic_deploy_kernel_uuid,
-                'deploy_ramdisk':
-                    STUB_PARAMETERS.os_ironic_deploy_ramdisk_uuid,
-                'server_hardware_uri':
-                    selected_sh.uri,
-            },
-            'properties': {
-                'cpus': selected_sh.cpus,
-                'memory_mb': selected_sh.memory_mb,
-                'local_gb': selected_sh.local_gb,
-                'cpu_arch': selected_sh.cpu_arch,
-                'capabilities':
-                    'server_hardware_type_uri:%s,'
-                    'enclosure_group_uri:%s,'
-                    'server_profile_template_uri:%s' % (
-                        selected_sh.server_hardware_type_uri,
-                        selected_sh.enclosure_group_uri,
-                        selected_spt.uri
-                    )
-            }
-        }
+        attrs = self._create_attrs_for_node(selected_sh, selected_spt)
+
+        ironic_client = mock_ironic_client.return_value
+        ironic_client.node.create.assert_called_with(
+            **attrs
+        )
+
+    @mock.patch('ironic_oneview_cli.common.input')
+    def test_node_creation_with_oneview_ml2_driver(
+        self, mock_input, mock_oneview_client, mock_ironic_client
+    ):
+        self.args.use_oneview_ml2_driver = True
+
+        oneview_client = mock_oneview_client.return_value
+        oneview_client.server_hardware.list.return_value = (
+            POOL_OF_STUB_SERVER_HARDWARE
+        )
+        oneview_client.server_profile_template.list.return_value = (
+            POOL_OF_STUB_SERVER_PROFILE_TEMPLATE
+        )
+        spt_index = 0
+        sh_index = 0
+        mock_input.side_effect = [
+            str(spt_index + 1),
+            str(sh_index + 1)
+        ]
+
+        create_node_cmd.do_node_create(self.args)
+
+        selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
+        selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
+        attrs = self._create_attrs_for_node(selected_sh, selected_spt)
+
+        attrs['network_interface'] = 'neutron'
+
+        ironic_client = mock_ironic_client.return_value
+        ironic_client.node.create.assert_called_with(
+            **attrs
+        )
+
+    @mock.patch('ironic_oneview_cli.common.input')
+    def test_node_creation_rack_servers(
+        self, mock_input, mock_oneview_client, mock_ironic_client
+    ):
+        oneview_client = mock_oneview_client.return_value
+        oneview_client.server_hardware.list.return_value = (
+            POOL_OF_STUB_SERVER_HARDWARE
+        )
+        oneview_client.server_profile_template.list.return_value = (
+            POOL_OF_STUB_SERVER_PROFILE_TEMPLATE
+        )
+        spt_index = 0
+        sh_index = 3
+        mock_input.side_effect = [
+            str(spt_index + 1),
+            str(sh_index + 1)
+        ]
+
+        create_node_cmd.do_node_create(self.args)
+
+        selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
+        selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
+        attrs = self._create_attrs_for_node(selected_sh, selected_spt)
+
+        attrs['properties']['capabilities'] = (
+            'server_hardware_type_uri:%s,'
+            'server_profile_template_uri:%s' % (
+                selected_sh.server_hardware_type_uri,
+                selected_spt.uri
+            )
+        )
 
         ironic_client = mock_ironic_client.return_value
         ironic_client.node.create.assert_called_with(
@@ -459,26 +524,16 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
 
         selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
         selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
-        attrs = {
-            'driver': STUB_PARAMETERS.os_ironic_node_driver,
-            'driver_info': {
-                'dynamic_allocation': True,
-                'deploy_kernel': STUB_PARAMETERS.os_ironic_deploy_kernel_uuid,
-                'deploy_ramdisk':
-                    STUB_PARAMETERS.os_ironic_deploy_ramdisk_uuid,
-                'server_hardware_uri':
-                    selected_sh.uri,
-            },
-            'properties': {
-                'capabilities':
-                    'server_hardware_type_uri:%s,'
-                    'enclosure_group_uri:%s,'
-                    'server_profile_template_uri:%s' % (
-                        selected_sh.server_hardware_type_uri,
-                        selected_sh.enclosure_group_uri,
-                        selected_spt.uri
-                    )
-            }
+        attrs = self._create_attrs_for_node(selected_sh, selected_spt)
+
+        attrs['properties'] = {
+            'capabilities': 'server_hardware_type_uri:%s,'
+                            'server_profile_template_uri:%s,'
+                            'enclosure_group_uri:%s' % (
+                                selected_sh.server_hardware_type_uri,
+                                selected_spt.uri,
+                                selected_sh.enclosure_group_uri
+                            )
         }
 
         ironic_client = mock_ironic_client.return_value
@@ -540,31 +595,7 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
         selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
         selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
 
-        attrs = {
-            'driver': STUB_PARAMETERS.os_ironic_node_driver,
-            'driver_info': {
-                'dynamic_allocation': True,
-                'deploy_kernel': STUB_PARAMETERS.os_ironic_deploy_kernel_uuid,
-                'deploy_ramdisk':
-                    STUB_PARAMETERS.os_ironic_deploy_ramdisk_uuid,
-                'server_hardware_uri':
-                    selected_sh.uri,
-            },
-            'properties': {
-                'cpus': selected_sh.cpus,
-                'memory_mb': selected_sh.memory_mb,
-                'local_gb': selected_sh.local_gb,
-                'cpu_arch': selected_sh.cpu_arch,
-                'capabilities':
-                    'server_hardware_type_uri:%s,'
-                    'enclosure_group_uri:%s,'
-                    'server_profile_template_uri:%s' % (
-                        selected_sh.server_hardware_type_uri,
-                        selected_sh.enclosure_group_uri,
-                        selected_spt.uri
-                    )
-            }
-        }
+        attrs = self._create_attrs_for_node(selected_sh, selected_spt)
 
         ironic_client = mock_ironic_client.return_value
         ironic_client.node.create.assert_called_with(
@@ -594,31 +625,7 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
         selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
         selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
 
-        attrs = {
-            'driver': STUB_PARAMETERS.os_ironic_node_driver,
-            'driver_info': {
-                'dynamic_allocation': True,
-                'deploy_kernel': STUB_PARAMETERS.os_ironic_deploy_kernel_uuid,
-                'deploy_ramdisk':
-                    STUB_PARAMETERS.os_ironic_deploy_ramdisk_uuid,
-                'server_hardware_uri':
-                    selected_sh.uri,
-            },
-            'properties': {
-                'cpus': selected_sh.cpus,
-                'memory_mb': selected_sh.memory_mb,
-                'local_gb': selected_sh.local_gb,
-                'cpu_arch': selected_sh.cpu_arch,
-                'capabilities':
-                    'server_hardware_type_uri:%s,'
-                    'enclosure_group_uri:%s,'
-                    'server_profile_template_uri:%s' % (
-                        selected_sh.server_hardware_type_uri,
-                        selected_sh.enclosure_group_uri,
-                        selected_spt.uri
-                    )
-            }
-        }
+        attrs = self._create_attrs_for_node(selected_sh, selected_spt)
 
         ironic_client = mock_ironic_client.return_value
         ironic_client.node.create.assert_any_call(
@@ -841,6 +848,32 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
 
         self.assertEqual(7, ironic_client.node.delete.call_count)
 
+    def _create_attrs_for_node(self, server_hardware, server_profile_template):
+        attrs = {
+            'driver': STUB_PARAMETERS.os_ironic_node_driver,
+            'driver_info': {
+                'dynamic_allocation': True,
+                'use_oneview_ml2_driver': self.args.use_oneview_ml2_driver,
+                'deploy_kernel': STUB_PARAMETERS.os_ironic_deploy_kernel_uuid,
+                'deploy_ramdisk':
+                    STUB_PARAMETERS.os_ironic_deploy_ramdisk_uuid,
+                'server_hardware_uri':
+                    server_hardware.uri,
+            },
+            'properties': {
+                'cpus': server_hardware.cpus,
+                'memory_mb': server_hardware.memory_mb,
+                'local_gb': server_hardware.local_gb,
+                'cpu_arch': server_hardware.cpu_arch,
+                'capabilities':
+                    'server_hardware_type_uri:%s,'
+                    'server_profile_template_uri:%s,'
+                    'enclosure_group_uri:%s' % (
+                        server_hardware.server_hardware_type_uri,
+                        server_profile_template.uri,
+                        server_hardware.enclosure_group_uri
+                    )
+            }
+        }
 
-if __name__ == '__main__':
-    unittest.main()
+        return attrs

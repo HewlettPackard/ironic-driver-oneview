@@ -61,14 +61,15 @@ class FakeIronicPort(object):
 
 
 class FakeServerHardware(object):
-    def __init__(self, name, uuid, uri, power_state, server_profile_uri,
-                 server_hardware_type_uri, enclosure_group_uri, state,
-                 enclosure_uri):
+    def __init__(self, name, uuid, uri, power_state, port_map,
+                 server_profile_uri, server_hardware_type_uri,
+                 enclosure_group_uri, state, enclosure_uri):
 
         self.name = name
         self.uuid = uuid
         self.uri = uri
         self.power_state = power_state
+        self.port_map = port_map
         self.server_profile_uri = server_profile_uri
         self.server_hardware_type_uri = server_hardware_type_uri
         self.enclosure_group_uri = enclosure_group_uri
@@ -101,7 +102,10 @@ POOL_OF_FAKE_IRONIC_NODES = [
              'extra': {}}
         ],
         driver='fake_oneview',
-        driver_info={'user': 'foo', 'password': 'bar'},
+        driver_info={'use_oneview_ml2_driver': True, 'user': 'foo',
+                     'password': 'bar',
+                     'server_hardware_uri':
+                     '/rest/server-hardware-types/111112222233333'},
         properties={'num_cpu': 4},
         name='fake-node-1',
         extra={}
@@ -121,18 +125,42 @@ POOL_OF_FAKE_IRONIC_NODES = [
         ],
         driver='fake_oneview',
         driver_info={
-            'dynamic_allocation': True, 'user': 'foo', 'password': 'bar'
+            'dynamic_allocation': True,
+            'user': 'foo', 'password': 'bar'
         },
         properties={'num_cpu': 4},
         name='fake-node-2',
         extra={}
-    )
+    ),
+    FakeIronicNode(
+        id=123,
+        uuid='66666666-7777-8888-9999-000000000000',
+        chassis_uuid='aaaaaaaa-1111-bbbb-2222-cccccccccccc',
+        maintenance=False,
+        provision_state='enroll',
+        ports=[
+            {'id': 987,
+             'uuid': '11111111-2222-3333-4444-555555555555',
+             'node_uuid': '66666666-7777-8888-9999-000000000000',
+             'address': 'AA:BB:CC:DD:EE:FF',
+             'extra': {}}
+        ],
+        driver='fake_oneview',
+        driver_info={'use_oneview_ml2_driver': False, 'user': 'foo',
+                     'password': 'bar',
+                     'server_hardware_uri':
+                     '/rest/server-hardware-types/111112222233333'},
+        properties={'num_cpu': 4},
+        name='fake-node-3',
+        extra={}
+    ),
 ]
 
 POOL_OF_FAKE_IRONIC_PORTS = [
     FakeIronicPort(
         id=987,
         uuid='11111111-2222-3333-4444-555555555555',
+        local_link_connection=None,
         node_uuid='66666666-7777-8888-9999-000000000000',
         address='AA:BB:CC:DD:EE:FF',
         extra={}
@@ -144,6 +172,7 @@ POOL_OF_FAKE_SERVER_HARDWARE = [
         name='AAAAA',
         uuid='11111111-7777-8888-9999-000000000000',
         uri='/rest/server-hardware/11111',
+        port_map={'deviceSlots': ''},
         power_state='Off',
         server_profile_uri='',
         server_hardware_type_uri='/rest/server-hardware-types/111112222233333',
@@ -189,8 +218,7 @@ class TestIronicOneviewd(unittest.TestCase):
         node_manager.manage_node_provision_state(fake_node)
         mock_take_manageable_state_actions.assert_called_with(fake_node)
 
-    @mock.patch('ironic_oneviewd.conf.CONF.openstack.inspection_enabled',
-                new_callable=mock.PropertyMock)
+    @mock.patch('ironic_oneviewd.conf.CONF.openstack.inspection_enabled')
     @mock.patch('ironic_oneviewd.facade.Facade', new_callable=mock.MagicMock)
     def test_manage_provision_state_when_dynamic_allocation_inspection_enabled(
         self, mock_facade, mock_inspection_enabled
@@ -219,6 +247,39 @@ class TestIronicOneviewd(unittest.TestCase):
         node_manager.manage_node_provision_state(fake_node)
         mock_facade.set_node_provision_state.assert_called_with(fake_node,
                                                                 'manage')
+
+    @mock.patch('ironic_oneviewd.facade.Facade', autospec=True)
+    @mock.patch.object(manage.NodeManager, 'is_bootable')
+    def test_set_local_link_connection_use_ml2_oneview(
+        self, mock_is_bootable, mock_facade
+    ):
+        mock_is_bootable.return_value = True
+        switch_info = (
+            '{"server_hardware_id": "111112222233333", "bootable": "True"}')
+
+        local_link_connection = {
+            "switch_id": "01:23:45:67:89:ab",
+            "port_id": "",
+            "switch_info": switch_info
+            }
+
+        fake_node = copy.deepcopy(POOL_OF_FAKE_IRONIC_NODES[0])
+        node_manager = NodeManager()
+        call_driver = node_manager.set_local_link_connection(
+            fake_node, "AA:BB:CC:DD:EE:FF"
+        )
+        self.assertDictEqual(local_link_connection, call_driver)
+
+    @mock.patch('ironic_oneviewd.facade.Facade', autospec=True)
+    def test_set_local_link_connection_not_use_ml2_oneview(self, mock_facade):
+        local_link_connection = {}
+        fake_node = copy.deepcopy(POOL_OF_FAKE_IRONIC_NODES[2])
+        node_manager = NodeManager()
+
+        call_driver = node_manager.set_local_link_connection(
+            fake_node, "AA:BB:CC:DD:EE:FF"
+        )
+        self.assertDictEqual(local_link_connection, call_driver)
 
     @mock.patch('ironic_oneviewd.facade.Facade', autospec=True)
     @mock.patch.object(facade.Facade, 'get_port')

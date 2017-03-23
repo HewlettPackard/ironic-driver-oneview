@@ -37,14 +37,14 @@ class Flavor(object):
         extra_specs['cpu_arch'] = self.cpu_arch
 
         if hasattr(self, 'server_profile_template_uri'):
-            extra_specs['capabilities:server_profile_template_uri'] = \
-                self.server_profile_template_uri
+            extra_specs['capabilities:server_profile_template_uri'] = (
+                self.server_profile_template_uri)
         if hasattr(self, 'server_hardware_type_uri'):
-            extra_specs['capabilities:server_hardware_type_uri'] = \
-                self.server_hardware_type_uri
-        if hasattr(self, 'enclosure_group_uri'):
-            extra_specs['capabilities:enclosure_group_uri'] = \
-                self.enclosure_group_uri
+            extra_specs['capabilities:server_hardware_type_uri'] = (
+                self.server_hardware_type_uri)
+        if getattr(self, 'enclosure_group_uri'):
+            extra_specs['capabilities:enclosure_group_uri'] = (
+                self.enclosure_group_uri)
         return extra_specs
 
     def __repr__(self):

@@ -47,3 +47,12 @@ def upgrade():
             'oneview_network_id', 'oneview_uplinkset_id'
         )
     )
+    op.create_table(
+        'oneview_network_lig',
+        sa.Column('oneview_network_id', sa.String(length=36)),
+        sa.Column('oneview_lig_id', sa.String(length=36)),
+        sa.Column('oneview_uplinkset_name', sa.String(length=36)),
+        sa.PrimaryKeyConstraint(
+            'oneview_network_id', 'oneview_lig_id', 'oneview_uplinkset_name'
+        )
+    )

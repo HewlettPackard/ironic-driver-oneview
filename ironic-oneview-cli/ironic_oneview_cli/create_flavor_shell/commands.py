@@ -171,7 +171,7 @@ def do_flavor_create(args):
 
         flavor = common.get_element_by_id(flavor_list, input_id)
 
-        print("Listing chosen Flavor configuration...")
+        print("Listing chosen flavor configuration...")
         common.print_prompt(
             [flavor],
             [

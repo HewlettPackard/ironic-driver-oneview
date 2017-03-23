@@ -12,50 +12,54 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
 import json
 import re
-import sys
-import time
-from datetime import datetime
-from oslo_service import loopingcall
-from oslo_log import log
+
 from hpOneView import exceptions
+from networking_oneview.ml2.drivers.oneview import (
+    database_manager as db_manager)
+from networking_oneview.ml2.drivers.oneview import common
+from oslo_log import log
+from oslo_service import loopingcall
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from networking_oneview.ml2.drivers.oneview import common
-from networking_oneview.ml2.drivers.oneview import (
-    database_manager as db_manager
-)
+from itertools import chain
 
 LOG = log.getLogger(__name__)
 
 
-def get_session(connection):
-    Session = sessionmaker(bind=create_engine(connection), autocommit=True)
-    return Session()
-
-
-class Synchronization:
-    def __init__(self, oneview_client, neutron_oneview_client, connection):
+class Synchronization(object):
+    def __init__(
+            self, oneview_client, neutron_oneview_client, connection,
+            uplinkset_mappings, flat_net_mappings):
         self.oneview_client = oneview_client
         self.neu_ov_client = neutron_oneview_client
         self.connection = connection
-        self.check_unique_uplinkset_constraint()
-        self.check_lig_constraint()
+        self.uplinkset_mappings = uplinkset_mappings
+        self.flat_net_mappings = flat_net_mappings
+        self.check_unique_lig_per_provider_constraint()
+        self.check_uplinkset_types_constraint()
+
+    def start(self):
         heartbeat = loopingcall.FixedIntervalLoopingCall(self.synchronize)
         heartbeat.start(interval=3600, initial_delay=0)
 
+    def get_session(self):
+        Session = sessionmaker(bind=create_engine(self.connection),
+                               autocommit=True)
+        return Session()
+
     def synchronize(self):
+        self.delete_outdated_flat_mapped_networks()
         self.create_oneview_networks_from_neutron()
         self.delete_unmapped_oneview_networks()
         self.synchronize_uplinkset_from_mapped_networks()
         self.create_connection()
 
-    def get_oneview_network(self, oneview_network_id):
+    def get_oneview_network(self, oneview_net_id):
         try:
-            return self.oneview_client.ethernet_networks.get(
-                oneview_network_id
-            )
+            return self.oneview_client.ethernet_networks.get(oneview_net_id)
         except exceptions.HPOneViewException as err:
             LOG.error(err)
 
@@ -65,84 +69,84 @@ class Synchronization:
         db_manager.delete_neutron_oneview_network(
             session, neutron_network_id=neutron_network_id
         )
-
-        db_manager.delete_oneview_network_uplinkset_by_network(
-            session, oneview_network_id
+        db_manager.delete_oneview_network_lig(
+            session, oneview_network_id=oneview_network_id
         )
 
-    def check_lig_constraint(self):
-        physnet_mappings = self.neu_ov_client.port.physnet_uplinkset_mapping
-        for key in physnet_mappings:
-            for _type in physnet_mappings[key]:
-                uplinksets = physnet_mappings[key][_type]
-                lgis = []
-                for uplinkset in uplinksets:
-                    us = self.oneview_client.uplink_sets.get(uplinkset)
-                    uplink_type = us.get('ethernetNetworkType')
-                    li = self.oneview_client.logical_interconnects.get(
-                        us.get('logicalInterconnectUri'))
-                    lig = self.oneview_client.logical_interconnect_groups.get(
-                        li.get('logicalInterconnectGroupUri')
-                    )
-                    lig_uri = lig.get('uri')
-                    if lig_uri not in lgis:
-                        lgis.append(lig_uri)
-                    else:
-                        err = (
-                            "There is more than one uplinkset of "
-                            "type %(uplinktype)s from the same logical "
-                            "interconnect group mapped "
-                            "for the same physnet") % {
-                                'uplinktype': uplink_type
-                                }
-                        LOG.error(err)
-                        sys.exit(1)
+    def check_uplinkset_types_constraint(self):
+        """Check the number of uplinkset types for a provider in a LIG.
 
-    def check_unique_uplinkset_constraint(self):
-        mapped_uplinksets = []
-        physnet_mappings = self.neu_ov_client.port.physnet_uplinkset_mapping
-        for key in physnet_mappings:
-            for _type in physnet_mappings[key]:
-                uplinksets = physnet_mappings[key][_type]
-                uplinksets_checked = []
-                for uplinkset in uplinksets:
-                    if uplinkset in uplinksets_checked:
-                        warning = (
-                            "Uplinkset %(uplinkset)s is duplicated "
-                            "in the same Physical Network") % {
-                                'uplinkset': uplinkset
-                                }
-                        LOG.warning(warning)
-                    else:
-                        uplinksets_checked.append(uplinkset)
-                for uplinkset in uplinksets_checked:
-                    if uplinkset in mapped_uplinksets:
+        It is only possible to map one provider to at the most one uplink
+        of each type.
+        """
+        for provider in self.uplinkset_mappings:
+            provider_mapping = zip(
+                self.uplinkset_mappings.get(provider)[::2],
+                self.uplinkset_mappings.get(provider)[1::2])
+            uplinksets_type = {}
+            for lig_id, ups_name in provider_mapping:
+                lig_mappings = uplinksets_type.setdefault(lig_id, [])
+                lig = self.oneview_client.logical_interconnect_groups.get(
+                    lig_id
+                )
+                uplinkset = common.get_uplinkset_by_name_from_list(
+                    lig.get('uplinkSets'), ups_name)
+                lig_mappings.append(uplinkset.get('ethernetNetworkType'))
+
+                if len(lig_mappings) != len(set(lig_mappings)):
+                    err = (
+                        "The provider %(provider)s has more than one "
+                        "uplinkset of the same type in the logical "
+                        "interconnect group %(lig_id)s."
+                    ) % {"provider": provider, "lig_id": lig_id}
+                    LOG.error(err)
+                    raise Exception(err)
+
+    def check_unique_lig_per_provider_constraint(self):
+        for provider in self.uplinkset_mappings:
+            for provider2 in self.uplinkset_mappings:
+                if provider != provider2:
+                    provider_lig_mapping_tupples = zip(
+                        self.uplinkset_mappings.get(provider)[::2],
+                        self.uplinkset_mappings.get(provider)[1::2])
+                    provider2_lig_mapping_tupples = zip(
+                        self.uplinkset_mappings.get(provider2)[::2],
+                        self.uplinkset_mappings.get(provider2)[1::2])
+                    identical_mappings = (set(provider_lig_mapping_tupples) &
+                                          set(provider2_lig_mapping_tupples))
+                    if identical_mappings:
+                        err_message_attrs = {
+                            "prov1": provider,
+                            "prov2": provider2,
+                            "identical_mappings": "\n".join(
+                                (", ".join(mapping)
+                                    for mapping in identical_mappings)
+                            )
+                        }
                         err = (
-                            "Uplinkset %(uplinkset)s is used by more "
-                            "than one Physical Network") % {
-                                'uplinkset': uplinkset
-                                }
+                            "The providers %(prov1)s and %(prov2)s are being "
+                            "mapped to the same Logical Interconnect Group "
+                            "and the same Uplinkset.\n"
+                            "The LIG ids and Uplink names are:\n"
+                            "%(identical_mappings)s"
+                        ) % err_message_attrs
                         LOG.error(err)
-                        sys.exit(1)
-                    else:
-                        mapped_uplinksets.append(uplinkset)
+                        raise Exception(err)
 
     def create_oneview_networks_from_neutron(self):
-        session = get_session(self.connection)
+        session = self.get_session()
         for network, network_segment in (
             db_manager.list_networks_and_segments_with_physnet(session)
         ):
-            id = network.get('id')
+            net_id = network.get('id')
             neutron_oneview_network = db_manager.get_neutron_oneview_network(
-                session, id
+                session, net_id
             )
-            if neutron_oneview_network is not None:
+            if neutron_oneview_network:
                 oneview_network = self.get_oneview_network(
                     neutron_oneview_network.oneview_network_id
                 )
-                if oneview_network is not None:
-                    continue
-                else:
+                if not oneview_network:
                     self._remove_inconsistence_from_db(
                         session,
                         neutron_oneview_network.neutron_network_id,
@@ -153,13 +157,13 @@ class Synchronization:
             network_type = network_segment.get('network_type')
             segmentation_id = network_segment.get('segmentation_id')
             network_dict = common.network_dict_for_network_creation(
-                physical_network, network_type, id, segmentation_id
+                physical_network, network_type, net_id, segmentation_id
             )
 
             self.neu_ov_client.network.create(session, network_dict)
 
     def synchronize_uplinkset_from_mapped_networks(self):
-        session = get_session(self.connection)
+        session = self.get_session()
         for neutron_oneview_network in (
             db_manager.list_neutron_oneview_network(session)
         ):
@@ -168,23 +172,19 @@ class Synchronization:
             network_segment = db_manager.get_network_segment(
                 session, neutron_network_id
             )
-            if network_segment is not None:
-                self.neu_ov_client.network.update_uplinksets(
+            if network_segment:
+                self.neu_ov_client.network.update_network_lig(
                     session, oneview_network_id, network_segment.get(
-                        'network_type'
-                    ),
-                    network_segment.get('physical_network')
-                )
+                        'network_type'), network_segment.get(
+                        'physical_network'))
 
     def delete_unmapped_oneview_networks(self):
-        session = get_session(self.connection)
-
+        session = self.get_session()
         for network in self.oneview_client.ethernet_networks.get_all():
             m = re.search('Neutron \[(.*)\]', network.get('name'))
             if m:
                 oneview_network_id = common.id_from_uri(network.get('uri'))
                 neutron_network_id = m.group(1)
-
                 neutron_network = db_manager.get_neutron_network(
                     session, neutron_network_id
                 )
@@ -192,22 +192,41 @@ class Synchronization:
                     session, neutron_network_id
                 )
                 if neutron_network is None:
-                    return self.oneview_client.ethernet_networks.delete(
+                    self.oneview_client.ethernet_networks.delete(
                         oneview_network_id
+                    )
+                    self._remove_inconsistence_from_db(
+                        session, neutron_network_id, oneview_network_id
                     )
                 else:
                     physnet = network_segment.get('physical_network')
                     network_type = network_segment.get('network_type')
-                    if not self.neu_ov_client.network.is_managed(
+                    if not self.neu_ov_client.network.is_uplinkset_mapping(
                         physnet, network_type
                     ):
                         self._delete_connections(neutron_network_id)
-                        return self.neu_ov_client.network.delete(
+                        self.neu_ov_client.network.delete(
                             session, {'id': neutron_network_id}
                         )
 
+    def delete_outdated_flat_mapped_networks(self):
+        session = self.get_session()
+        mappings = self.flat_net_mappings.values()
+        mapped_networks_uuids = list(chain.from_iterable(mappings))
+        oneview_networks_uuids = (
+            network.oneview_network_id for network
+            in db_manager.list_neutron_oneview_network(session)
+            if not network.manageable)
+        unmapped_networks_uuids = (
+            uuid for uuid
+            in oneview_networks_uuids
+            if uuid not in mapped_networks_uuids)
+        for uuid in unmapped_networks_uuids:
+            db_manager.delete_neutron_oneview_network(
+                session, oneview_network_id=uuid)
+
     def _delete_connections(self, neutron_network_id):
-        session = get_session(self.connection)
+        session = self.get_session()
         for port, port_binding in (
             db_manager.get_port_with_binding_profile_by_net(
                 session, neutron_network_id
@@ -218,10 +237,11 @@ class Synchronization:
                 port.get('mac_address'),
                 json.loads(port_binding.get('profile'))
             )
-            lli = common.local_link_information_from_port(port_dict)
-            server_hardware_id = lli[0].get('switch_info').get(
-                'server_hardware_id'
-                )
+            local_link_info = common.local_link_information_from_port(
+                port_dict)
+            server_hardware_id = (
+                common.server_hardware_id_from_local_link_information_list(
+                    local_link_info))
             server_profile = (
                 self.neu_ov_client.port.server_profile_from_server_hardware(
                     server_hardware_id
@@ -259,10 +279,10 @@ class Synchronization:
 
         for connection in connections:
             if (
-                connection.get('boot').get('priority') == 'Secondary' and
+                (connection.get('boot').get('priority') == 'Secondary') and
                 connection_primary
-                    ):
-                    connection['boot']['priority'] = 'Primary'
+            ):
+                connection['boot']['priority'] = 'Primary'
 
         server_profile_to_update = server_profile.copy()
         server_profile_to_update['connections'] = connections
@@ -271,22 +291,28 @@ class Synchronization:
             id_or_uri=server_profile_to_update.get('uri')
         )
 
-    def create_connection(
-        self
-    ):
-        session = get_session(self.connection)
+    def create_connection(self):
+        """Recreate connection that were deleted on Oneview.
+
+        Calls method to fix critical connections in the Server Profile that
+        will be used.
+        """
+        session = self.get_session()
+
         for port, port_binding in db_manager.get_port_with_binding_profile(
             session
         ):
             port_dict = common.port_dict_for_port_creation(
-                port.get('network_id'), port_binding.get('vnic_type'),
+                port.get('network_id'),
+                port_binding.get('vnic_type'),
                 port.get('mac_address'),
                 json.loads(port_binding.get('profile'))
             )
-            lli = common.local_link_information_from_port(port_dict)
-            server_hardware_id = lli[0].get('switch_info').get(
-                'server_hardware_id'
-                )
+            local_link_info = common.local_link_information_from_port(
+                port_dict)
+            server_hardware_id = (
+                common.server_hardware_id_from_local_link_information_list(
+                local_link_info))
             server_profile = (
                 self.neu_ov_client.port.server_profile_from_server_hardware(
                     server_hardware_id
@@ -301,7 +327,7 @@ class Synchronization:
                     neutron_oneview_network[0].oneview_network_id
                 )
                 self.fix_connections_with_removed_networks(
-                    server_profile, oneview_uri
+                    server_profile
                 )
                 for c in server_profile.get('connections'):
                     if c.get('mac') == port.get('mac_address'):
@@ -335,24 +361,26 @@ class Synchronization:
             server_profile.get('uuid'), previous_power_state
         )
 
-    def fix_connections_with_removed_networks(
-        self, server_profile, oneview_uri
-    ):
+    def fix_connections_with_removed_networks(self, server_profile):
         sp_cons = []
+
         for connection in server_profile.get('connections'):
-            conn_network_id = oneview_network_id = common.id_from_uri(
+            conn_network_id = common.id_from_uri(
                 connection.get('networkUri')
             )
-            if self.get_oneview_network(conn_network_id) is not None:
+            if self.get_oneview_network(conn_network_id):
                 sp_cons.append(connection)
+
         server_profile['connections'] = sp_cons
         self.neu_ov_client.port.check_server_hardware_availability(
             server_profile.get('serverHardwareUri')
         )
-        previous_power_state = self.neu_ov_client.port\
-            .get_server_hardware_power_state(
+        previous_power_state = (
+            self.neu_ov_client.port.get_server_hardware_power_state(
                 server_profile.get('serverHardwareUri')
-                )
+            )
+        )
+
         self.neu_ov_client.port.update_server_hardware_power_state(
             server_profile.get('serverHardwareUri'), "Off")
         self.oneview_client.server_profiles.update(
@@ -361,4 +389,4 @@ class Synchronization:
         )
         self.neu_ov_client.port.update_server_hardware_power_state(
             server_profile.get('serverHardwareUri'), previous_power_state
-            )
+        )

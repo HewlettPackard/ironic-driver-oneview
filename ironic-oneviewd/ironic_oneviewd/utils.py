@@ -68,7 +68,7 @@ def get_ironic_client():
         'os_user_domain_name': CONF.openstack.user_domain_name,
         'os_project_domain_id': CONF.openstack.project_domain_id,
         'os_project_domain_name': CONF.openstack.project_domain_name,
-        'os_ironic_api_version': '1.11'
+        'os_ironic_api_version': '1.22'
     }
 
     LOG.debug("Using OpenStack credentials specified in the configuration "
