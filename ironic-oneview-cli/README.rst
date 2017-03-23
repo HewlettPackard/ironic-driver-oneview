@@ -20,6 +20,8 @@ allocation model [1]_ [2]_.
    version 0.0.2 of this tool.
 .. note::
    This tool works with OpenStack Identity API v2.0 and v3.
+.. note::
+   This tool works with OpenStack Ironic API microversion '1.22'.
 
 ----
 
@@ -142,6 +144,13 @@ the following command::
 .. note::
    You can use both arguments at once.
 
+If you have the Networking OneView ML2 Driver enabled, use the following
+command to add this information in the node driver_info::
+
+    $ ironic-oneview node-create --use-oneview-ml2-driver
+
+For more information on *Networking OneView ML2 Driver*, see [5]_.
+
 ----
 
 To list all nodes in Ironic, use the command::
@@ -239,3 +248,4 @@ References
 .. [2] Driver documentation - http://docs.openstack.org/developer/ironic/drivers/oneview.html
 .. [3] HPE OneView - https://www.hpe.com/us/en/integrated-systems/software.html
 .. [4] OpenStack RC - http://docs.openstack.org/user-guide/common/cli_set_environment_variables_using_openstack_rc.html
+.. [5] Networking OneView ML2 Driver - https://github.com/HewlettPackard/ironic-driver-oneview/tree/master/networking-oneview

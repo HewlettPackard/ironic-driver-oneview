@@ -31,7 +31,7 @@ from ironic_oneviewd.node_manager import commands as oneviewd_commands
 from ironic_oneviewd.openstack.common._i18n import _
 from ironic_oneviewd.openstack.common import cliutils
 
-VERSION = '0.5.1'
+VERSION = '0.6.0'
 
 COMMAND_MODULES = [
     oneviewd_commands,

@@ -38,7 +38,7 @@ from ironic_oneview_cli.migrate_node_shell import (
     commands as node_migrate_commands)
 from ironic_oneview_cli import service_logging as logging
 
-VERSION = '0.5.1'
+VERSION = '0.6.0'
 
 COMMAND_MODULES = [
     node_create_commands,
@@ -181,10 +181,10 @@ class IronicOneView(object):
 
         parser.add_argument('--ironic-api-version',
                             default=common.env(
-                                'IRONIC_API_VERSION', default='1.11'),
+                                'IRONIC_API_VERSION', default='1.22'),
                             help='Accepts 1.x (where "x" is microversion) '
                                  'or "latest", Defaults to '
-                                 'env[IRONIC_API_VERSION] or 1')
+                                 'env[IRONIC_API_VERSION] or 1.22')
 
         parser.add_argument('--ironic_api_version',
                             help=argparse.SUPPRESS)

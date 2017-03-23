@@ -59,9 +59,15 @@ class Facade(object):
     def get_port_list_by_mac(self, port_mac_address):
         return self.ironicclient.port.list(address=port_mac_address)
 
-    def create_node_port(self, node_uuid, port_mac_address):
-        return self.ironicclient.port.create(node_uuid=node_uuid,
-                                             address=port_mac_address)
+    def create_node_port(
+        self, node_uuid, mac_address,
+        local_link_connection=None
+    ):
+        return self.ironicclient.port.create(
+            node_uuid=node_uuid,
+            local_link_connection=local_link_connection,
+            address=mac_address
+        )
 
     # =========================================================================
     # OneView actions
