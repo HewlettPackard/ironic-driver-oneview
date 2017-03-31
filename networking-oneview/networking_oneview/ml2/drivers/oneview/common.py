@@ -244,4 +244,11 @@ def server_hardware_id_from_local_link_information_list(
     switch_info = local_link_information_list[0].get('switch_info')
     if isinstance(switch_info, unicode):
         switch_info = jsonutils.loads(switch_info)
-    server_hardware_id = switch_info.get('server_hardware_id')
+    return switch_info.get('server_hardware_id')
+
+def switch_info_from_local_link_information_list(
+    local_link_information_list):
+    switch_info = local_link_information_list[0].get('switch_info')
+    if isinstance(switch_info, unicode):
+        switch_info = jsonutils.loads(switch_info)
+    return switch_info
