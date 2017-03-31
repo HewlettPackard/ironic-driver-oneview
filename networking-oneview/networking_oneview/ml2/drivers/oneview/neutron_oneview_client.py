@@ -384,7 +384,8 @@ class Port(ResourceManager):
             session, network_id)
         network_uri = common.network_uri_from_id(
             neutron_oneview_network.oneview_network_id)
-
+        switch_info = common.switch_info_from_local_link_information_list(
+            local_link_information_list)
         server_hardware_id = (
             common.server_hardware_id_from_local_link_information_list(
                 local_link_information_list))
@@ -515,8 +516,8 @@ class Port(ResourceManager):
                     "'local_link_information' must have only one value")
                 return False
 
-            local_link_information = local_link_information_list[0]
-            switch_info = local_link_information.get('switch_info')
+            switch_info = common.switch_info_from_local_link_information_list(
+                local_link_information_list)
 
             if not switch_info:
                 LOG.warning(
