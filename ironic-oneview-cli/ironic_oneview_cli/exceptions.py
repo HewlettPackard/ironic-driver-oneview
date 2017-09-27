@@ -1,5 +1,5 @@
-# Copyright 2015 Hewlett-Packard Development Company, L.P.
-# Copyright 2015 Universidade Federal de Campina Grande
+# Copyright (2015-2017) Hewlett Packard Enterprise Development LP
+# Copyright (2015-2017) Universidade Federal de Campina Grande
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -28,6 +28,14 @@ class Unauthorized(ClientException):
 
 
 class OneViewConnectionError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class OneViewResourceNotFoundError(Exception):
     def __init__(self, value):
         self.value = value
 

@@ -1,5 +1,5 @@
-# Copyright 2015 Hewlett-Packard Development Company, L.P.
-# Copyright 2015 Universidade Federal de Campina Grande
+# Copyright (2015-2017) Hewlett Packard Enterprise Development LP
+# Copyright (2015-2017) Universidade Federal de Campina Grande
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -22,10 +22,10 @@ from ironic_oneview_cli.create_flavor_shell import (
     commands as create_flavor_cmd)
 from ironic_oneview_cli.create_node_shell import (
     commands as create_node_cmd)
+from ironic_oneview_cli.create_port_shell import (
+    commands as port_create_cmd)
 from ironic_oneview_cli.delete_node_shell import (
     commands as delete_node_cmd)
-from ironic_oneview_cli.migrate_node_shell import (
-    commands as migrate_node_cmd)
 from ironic_oneview_cli.tests import stubs
 
 POOL_OF_STUB_IRONIC_NODES = [
@@ -44,8 +44,7 @@ POOL_OF_STUB_IRONIC_NODES = [
         ],
         driver='fake_oneview',
         driver_info={'user': 'foo',
-                     'password': 'bar',
-                     'dynamic_allocation': True},
+                     'password': 'bar'},
         properties={'num_cpu': 4},
         name='fake-node-1',
         extra={}
@@ -87,8 +86,7 @@ POOL_OF_STUB_IRONIC_NODES = [
         driver='fake_oneview',
         driver_info={'server_hardware_uri': "/rest/server-hardware/22222",
                      'user': 'foo',
-                     'password': 'bar',
-                     'dynamic_allocation': False},
+                     'password': 'bar'},
         properties={'memory_mb': 32768,
                     'cpu_arch': 'x86_64',
                     'local_gb': 120,
@@ -125,7 +123,6 @@ POOL_OF_STUB_IRONIC_NODES = [
         uuid='33333333-4444-8888-9999-11111111111',
         chassis_uuid='aaaaaaaa-1111-bbbb-2222-cccccccccccc',
         maintenance=False,
-        maintenance_reason='Migrating to dynamic allocation',
         provision_state='enroll',
         ports=[
             {'id': 345,
@@ -137,8 +134,7 @@ POOL_OF_STUB_IRONIC_NODES = [
         driver='fake_oneview',
         driver_info={'server_hardware_uri': "/rest/server-hardware/22222",
                      'user': 'foo',
-                     'password': 'bar',
-                     'dynamic_allocation': True},
+                     'password': 'bar'},
         properties={'memory_mb': 32768,
                     'cpu_arch': 'x86_64',
                     'local_gb': 120,
@@ -152,7 +148,7 @@ POOL_OF_STUB_IRONIC_NODES = [
                         "/rest/server-profile-templates/1111112222233333"
                     },
         instance_uuid='1111-2222-3333-4444-5555',
-        name='fake-node-3',
+        name='fake-node-5',
         extra={}
     ),
     stubs.StubIronicNode(
@@ -172,8 +168,7 @@ POOL_OF_STUB_IRONIC_NODES = [
         driver='fake_oneview',
         driver_info={'server_hardware_uri': "/rest/server-hardware/22222",
                      'user': 'foo',
-                     'password': 'bar',
-                     'dynamic_allocation': True},
+                     'password': 'bar'},
         properties={'memory_mb': 32768,
                     'cpu_arch': 'x86_64',
                     'local_gb': 120,
@@ -187,7 +182,7 @@ POOL_OF_STUB_IRONIC_NODES = [
                         "/rest/server-profile-templates/1111112222233333"
                     },
         instance_uuid='1111-2222-3333-4444-5555',
-        name='fake-node-3',
+        name='fake-node-6',
         extra={}
     ),
     stubs.StubIronicNode(
@@ -207,8 +202,7 @@ POOL_OF_STUB_IRONIC_NODES = [
         driver='fake_oneview',
         driver_info={'server_hardware_uri': "/rest/server-hardware/11111",
                      'user': 'foo',
-                     'password': 'bar',
-                     'dynamic_allocation': False},
+                     'password': 'bar'},
         properties={'memory_mb': 32768,
                     'cpu_arch': 'x86_64',
                     'local_gb': 120,
@@ -221,7 +215,35 @@ POOL_OF_STUB_IRONIC_NODES = [
                         "server_profile_template_uri:"
                         "/rest/server-profile-templates/1111112222233333"
                     },
-        name='fake-node-3',
+        name='fake-node-7',
+        extra={}
+    ),
+    stubs.StubIronicNode(
+        id=8,
+        uuid='44444444-5555-6666-7777-88888888888',
+        chassis_uuid='aaaaaaaa-1111-bbbb-2222-cccccccccccc',
+        maintenance=False,
+        maintenance_reason='',
+        provision_state='enroll',
+        ports=[],
+        driver='fake_oneview',
+        driver_info={'server_hardware_uri': "/rest/server-hardware/22222",
+                     "use_oneview_ml2_driver": True,
+                     'user': 'foo',
+                     'password': 'bar'},
+        properties={'memory_mb': 32768,
+                    'cpu_arch': 'x86_64',
+                    'local_gb': 120,
+                    'cpus': 8,
+                    'capabilities':
+                        "server_hardware_type_uri:"
+                        "/rest/server-hardware-types/1111112222233333,"
+                        "enclosure_group_uri:"
+                        "/rest/enclosure-groups/1111112222233333,"
+                        "server_profile_template_uri:"
+                        "/rest/server-profile-templates/1111112222233333"
+                    },
+        name='fake-node-8',
         extra={}
     )
 
@@ -239,91 +261,106 @@ STUB_SERVER_HARDWARE_TYPE = stubs.StubServerHardwareType(
     uri='/rest/server-hardware/22222222-7777-8888-9999-AAAAAAAAAAA',
 )
 
-POOL_OF_STUB_SERVER_HARDWARE = [
-    stubs.StubServerHardware(
-        name='AAAAA',
-        uuid='11111111-7777-8888-9999-000000000000',
-        uri='/rest/server-hardware/11111',
-        power_state='Off',
-        server_profile_uri='',
-        server_hardware_type_uri='/rest/server-hardware-types/111112222233333',
-        enclosure_group_uri='/rest/enclosure-groups/1111112222233333',
-        status='OK',
-        state='Unknown',
-        state_reason='',
-        enclosure_uri='/rest/enclosures/1111112222233333',
-        processor_count=12,
-        processor_core_count=12,
-        memory_mb=16384,
-        port_map=[],
-        mp_host_info={}
-    ),
-    stubs.StubServerHardware(
-        name='BBBBB',
-        uuid='22222222-7777-8888-9999-000000000000',
-        uri='/rest/server-hardware/22222',
-        power_state='Off',
-        server_profile_uri='/rest/server-profile/1111-2222',
-        server_hardware_type_uri='/rest/server-hardware-types/111111222233333',
-        enclosure_group_uri='/rest/enclosure-groups/1111112222233333',
-        status='OK',
-        state='Unknown',
-        state_reason='',
-        enclosure_uri='/rest/enclosures/1111112222233333',
-        processor_count=12,
-        processor_core_count=12,
-        memory_mb=16384,
-        port_map=[],
-        mp_host_info={}
-    ),
-    stubs.StubServerHardware(
-        name='CCCCC',
-        uuid='33333333-7777-8888-9999-000000000000',
-        uri='/rest/server-hardware/33333',
-        power_state='Off',
-        server_profile_uri='',
-        server_hardware_type_uri='/rest/server-hardware-types/111111222223333',
-        enclosure_group_uri='/rest/enclosure-groups/1111112222233333',
-        status='OK',
-        state='Unknown',
-        state_reason='',
-        enclosure_uri='/rest/enclosures/1111112222233333',
-        processor_count=12,
-        processor_core_count=12,
-        memory_mb=16384,
-        port_map=[],
-        mp_host_info={}
-    ),
-    stubs.StubServerHardware(
-        name='RackServer',
-        uuid='33333333-7777-8888-9999-111111',
-        uri='/rest/server-hardware/44444',
-        power_state='Off',
-        server_profile_uri='',
-        server_hardware_type_uri='/rest/server-hardware-types/111111222223333',
-        enclosure_group_uri=None,
-        status='OK',
-        state='Unknown',
-        state_reason='',
-        enclosure_uri=None,
-        processor_count=12,
-        processor_core_count=12,
-        memory_mb=16384,
-        port_map=[],
-        mp_host_info={}
-    )
+POOL_OF_SERVER_HARDWARE = [
+    {
+        'name': 'AAAAA',
+        'uuid': '11111111-7777-8888-9999-000000000000',
+        'uri': '/rest/server-hardware/11111',
+        'powerState': 'Off',
+        'serverProfileUri': '',
+        'serverHardwareTypeUri':
+            '/rest/server-hardware-types/111112222233333',
+        'serverGroupUri': '/rest/enclosure-groups/1111112222233333',
+        'status': 'OK',
+        'state': 'Unknown',
+        'stateReason': '',
+        'locationUri': '/rest/enclosures/1111112222233333',
+        'processorCount': 12,
+        'processorCoreCount': 12,
+        'memoryMb': 16384,
+        'portMap': {},
+        'mpHostInfo': {}
+    },
+    {
+        'name': 'BBBBB',
+        'uuid': '22222222-7777-8888-9999-000000000000',
+        'uri': '/rest/server-hardware/22222',
+        'powerState': 'Off',
+        'serverProfileUri': '/rest/server-profile/1111-2222',
+        'serverHardwareTypeUri':
+            '/rest/server-hardware-types/111111222233333',
+        'serverGroupUri': '/rest/enclosure-groups/1111112222233333',
+        'status': 'OK',
+        'state': 'Unknown',
+        'stateReason': '',
+        'locationUri': '/rest/enclosures/1111112222233333',
+        'processorCount': 12,
+        'processorCoreCount': 12,
+        'memoryMb': 16384,
+        'portMap': {
+            'deviceSlots': [{
+                'physicalPorts': [{
+                    'type': 'Ethernet',
+                    'virtualPorts': [{
+                        'portFunction': 'a',
+                        'mac': 'aa:bb:cc:dd:ee:ff'
+                    }]
+                }]
+            }]
+        },
+        'mpHostInfo': {}
+    },
+    {
+        'name': 'CCCCC',
+        'uuid': '33333333-7777-8888-9999-000000000000',
+        'uri': '/rest/server-hardware/33333',
+        'powerState': 'Off',
+        'serverProfileUri': '',
+        'serverHardwareTypeUri':
+            '/rest/server-hardware-types/111111222223333',
+        'serverGroupUri': '/rest/enclosure-groups/1111112222233333',
+        'status': 'OK',
+        'state': 'Unknown',
+        'stateReason': '',
+        'locationUri': '/rest/enclosures/1111112222233333',
+        'processorCount': 12,
+        'processorCoreCount': 12,
+        'memoryMb': 16384,
+        'portMap': {},
+        'mpHostInfo': {}
+    },
+    {
+        'name': 'RackServer',
+        'uuid': '33333333-7777-8888-9999-111111',
+        'uri': '/rest/server-hardware/44444',
+        'powerState': 'Off',
+        'serverProfileUri': '',
+        'serverHardwareTypeUri':
+            '/rest/server-hardware-types/111111222223333',
+        'serverGroupUri': None,
+        'status': 'OK',
+        'state': 'Unknown',
+        'stateReason': '',
+        'locationUri': None,
+        'processorCount': 12,
+        'processorCoreCount': 12,
+        'memoryMb': 16384,
+        'portMap': {},
+        'mpHostInfo': {}
+    }
 ]
 
 
-POOL_OF_STUB_SERVER_PROFILE_TEMPLATE = [
-    stubs.StubServerProfileTemplate(
-        uri='/rest/server-profile-templates/1111112222233333',
-        name='TEMPLATETEMPLATETEMPLATE',
-        server_hardware_type_uri='/rest/server-hardware-types/111112222233333',
-        enclosure_group_uri='/rest/enclosure-groups/1111112222233333',
-        connections=[],
-        boot={}
-    )
+POOL_OF_SERVER_PROFILE_TEMPLATE = [
+    {
+        'uri': '/rest/server-profile-templates/1111112222233333',
+        'name': 'TEMPLATETEMPLATETEMPLATE',
+        'serverHardwareTypeUri':
+            '/rest/server-hardware-types/111111222223333',
+        'enclosureGroupUri': '/rest/enclosure-groups/1111112222233333',
+        'connections': [],
+        'boot': {}
+    }
 ]
 
 
@@ -354,13 +391,18 @@ POOL_OF_STUB_NOVA_FLAVORS = [
 
 STUB_PARAMETERS = stubs.StubParameters(
     os_ironic_node_driver='fake_oneview',
+    os_driver='fake_oneview',
+    os_power_interface='fake_oneview',
+    os_management_interface='fake_oneview',
+    os_inspect_interface='fake_oneview',
+    os_deploy_interface='fake_oneview',
     os_ironic_deploy_kernel_uuid='11111-22222-33333-44444-55555',
     os_ironic_deploy_ramdisk_uuid='55555-44444-33333-22222-11111'
 )
 
 
 @mock.patch('ironic_oneview_cli.openstack_client.get_ironic_client')
-@mock.patch('ironic_oneview_cli.common.client.ClientV2')
+@mock.patch('ironic_oneview_cli.common.hpclient.OneViewClient')
 class FunctionalTestIronicOneviewCli(unittest.TestCase):
 
     def setUp(self):
@@ -368,11 +410,6 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
             ov_auth_url='https://my-oneview',
             ov_username='ov-user',
             ov_password='secret',
-            ov_cacert='',
-            ov_max_polling_attempts=12,
-            ov_audit=False,
-            ov_audit_input='',
-            ov_audit_output='',
             os_auth_url='http://something',
             os_username='my_name',
             os_password='secret',
@@ -388,17 +425,25 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
             os_cert='',
             os_inspection_enabled=False,
             os_ironic_node_driver=STUB_PARAMETERS.os_ironic_node_driver,
+            os_driver=STUB_PARAMETERS.os_driver,
+            os_power_interface=STUB_PARAMETERS.os_power_interface,
+            os_management_interface=STUB_PARAMETERS.os_management_interface,
+            os_inspect_interface=STUB_PARAMETERS.os_inspect_interface,
+            os_deploy_interface=STUB_PARAMETERS.os_deploy_interface,
             os_ironic_deploy_kernel_uuid=(
                 STUB_PARAMETERS.os_ironic_deploy_kernel_uuid
             ),
             os_ironic_deploy_ramdisk_uuid=(
                 STUB_PARAMETERS.os_ironic_deploy_ramdisk_uuid
             ),
+
             all=False,
             server_profile_template_name=None,
             use_oneview_ml2_driver=False,
+            classic=False,
             number=None,
-            nodes=None
+            nodes=None,
+            mac=None
         )
 
     @mock.patch('ironic_oneview_cli.common.input')
@@ -406,11 +451,14 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
         self, mock_input, mock_oneview_client, mock_ironic_client
     ):
         oneview_client = mock_oneview_client.return_value
-        oneview_client.server_hardware.list.return_value = (
-            POOL_OF_STUB_SERVER_HARDWARE
+        oneview_client.server_hardware.get_all.return_value = (
+            POOL_OF_SERVER_HARDWARE
         )
-        oneview_client.server_profile_template.list.return_value = (
-            POOL_OF_STUB_SERVER_PROFILE_TEMPLATE
+        oneview_client.server_profile_templates.get_all.return_value = (
+            POOL_OF_SERVER_PROFILE_TEMPLATE
+        )
+        oneview_client.server_hardware.get.return_value = (
+            POOL_OF_SERVER_HARDWARE[1]
         )
         spt_index = 0
         sh_index = 0
@@ -421,8 +469,8 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
 
         create_node_cmd.do_node_create(self.args)
 
-        selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
-        selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
+        selected_sh = POOL_OF_SERVER_HARDWARE[sh_index]
+        selected_spt = POOL_OF_SERVER_PROFILE_TEMPLATE[spt_index]
         attrs = self._create_attrs_for_node(selected_sh, selected_spt)
 
         ironic_client = mock_ironic_client.return_value
@@ -437,11 +485,14 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
         self.args.use_oneview_ml2_driver = True
 
         oneview_client = mock_oneview_client.return_value
-        oneview_client.server_hardware.list.return_value = (
-            POOL_OF_STUB_SERVER_HARDWARE
+        oneview_client.server_hardware.get_all.return_value = (
+            POOL_OF_SERVER_HARDWARE
         )
-        oneview_client.server_profile_template.list.return_value = (
-            POOL_OF_STUB_SERVER_PROFILE_TEMPLATE
+        oneview_client.server_profile_templates.get_all.return_value = (
+            POOL_OF_SERVER_PROFILE_TEMPLATE
+        )
+        oneview_client.server_hardware.get.return_value = (
+            POOL_OF_SERVER_HARDWARE[1]
         )
         spt_index = 0
         sh_index = 0
@@ -452,11 +503,47 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
 
         create_node_cmd.do_node_create(self.args)
 
-        selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
-        selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
+        selected_sh = POOL_OF_SERVER_HARDWARE[sh_index]
+        selected_spt = POOL_OF_SERVER_PROFILE_TEMPLATE[spt_index]
         attrs = self._create_attrs_for_node(selected_sh, selected_spt)
 
         attrs['network_interface'] = 'neutron'
+
+        ironic_client = mock_ironic_client.return_value
+        ironic_client.node.create.assert_called_with(
+            **attrs
+        )
+
+    @mock.patch('ironic_oneview_cli.common.input')
+    def test_node_creation_with_classic_flag(
+        self, mock_input, mock_oneview_client, mock_ironic_client
+    ):
+        self.args.classic = True
+
+        oneview_client = mock_oneview_client.return_value
+        oneview_client.server_hardware.get_all.return_value = (
+            POOL_OF_SERVER_HARDWARE
+        )
+        oneview_client.server_profile_templates.get_all.return_value = (
+            POOL_OF_SERVER_PROFILE_TEMPLATE
+        )
+        oneview_client.server_hardware.get.return_value = (
+            POOL_OF_SERVER_HARDWARE[1]
+        )
+        spt_index = 0
+        sh_index = 0
+        mock_input.side_effect = [
+            str(spt_index + 1),
+            str(sh_index + 1)
+        ]
+
+        create_node_cmd.do_node_create(self.args)
+
+        selected_sh = POOL_OF_SERVER_HARDWARE[sh_index]
+        selected_spt = POOL_OF_SERVER_PROFILE_TEMPLATE[spt_index]
+        attrs = self._create_attrs_for_node(selected_sh, selected_spt)
+
+        attrs['driver'] = STUB_PARAMETERS.os_ironic_node_driver
 
         ironic_client = mock_ironic_client.return_value
         ironic_client.node.create.assert_called_with(
@@ -468,11 +555,14 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
         self, mock_input, mock_oneview_client, mock_ironic_client
     ):
         oneview_client = mock_oneview_client.return_value
-        oneview_client.server_hardware.list.return_value = (
-            POOL_OF_STUB_SERVER_HARDWARE
+        oneview_client.server_hardware.get_all.return_value = (
+            POOL_OF_SERVER_HARDWARE
         )
-        oneview_client.server_profile_template.list.return_value = (
-            POOL_OF_STUB_SERVER_PROFILE_TEMPLATE
+        oneview_client.server_profile_templates.get_all.return_value = (
+            POOL_OF_SERVER_PROFILE_TEMPLATE
+        )
+        oneview_client.server_hardware.get.return_value = (
+            POOL_OF_SERVER_HARDWARE[1]
         )
         spt_index = 0
         sh_index = 3
@@ -483,15 +573,15 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
 
         create_node_cmd.do_node_create(self.args)
 
-        selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
-        selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
+        selected_sh = POOL_OF_SERVER_HARDWARE[sh_index]
+        selected_spt = POOL_OF_SERVER_PROFILE_TEMPLATE[spt_index]
         attrs = self._create_attrs_for_node(selected_sh, selected_spt)
 
         attrs['properties']['capabilities'] = (
             'server_hardware_type_uri:%s,'
             'server_profile_template_uri:%s' % (
-                selected_sh.server_hardware_type_uri,
-                selected_spt.uri
+                selected_sh.get("serverHardwareTypeUri"),
+                selected_spt.get('uri')
             )
         )
 
@@ -507,11 +597,14 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
         self.args.os_inspection_enabled = True
 
         oneview_client = mock_oneview_client.return_value
-        oneview_client.server_hardware.list.return_value = (
-            POOL_OF_STUB_SERVER_HARDWARE
+        oneview_client.server_hardware.get_all.return_value = (
+            POOL_OF_SERVER_HARDWARE
         )
-        oneview_client.server_profile_template.list.return_value = (
-            POOL_OF_STUB_SERVER_PROFILE_TEMPLATE
+        oneview_client.server_profile_templates.get_all.return_value = (
+            POOL_OF_SERVER_PROFILE_TEMPLATE
+        )
+        oneview_client.server_hardware.get.return_value = (
+            POOL_OF_SERVER_HARDWARE[1]
         )
         spt_index = 0
         sh_index = 0
@@ -522,17 +615,17 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
 
         create_node_cmd.do_node_create(self.args)
 
-        selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
-        selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
+        selected_sh = POOL_OF_SERVER_HARDWARE[sh_index]
+        selected_spt = POOL_OF_SERVER_PROFILE_TEMPLATE[spt_index]
         attrs = self._create_attrs_for_node(selected_sh, selected_spt)
 
         attrs['properties'] = {
             'capabilities': 'server_hardware_type_uri:%s,'
                             'server_profile_template_uri:%s,'
                             'enclosure_group_uri:%s' % (
-                                selected_sh.server_hardware_type_uri,
-                                selected_spt.uri,
-                                selected_sh.enclosure_group_uri
+                                selected_sh.get("serverHardwareTypeUri"),
+                                selected_spt.get("uri"),
+                                selected_sh.get("serverGroupUri")
                             )
         }
 
@@ -548,11 +641,14 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
         self.args.number = 2
 
         oneview_client = mock_oneview_client.return_value
-        oneview_client.server_hardware.list.return_value = (
-            POOL_OF_STUB_SERVER_HARDWARE
+        oneview_client.server_hardware.get_all.return_value = (
+            POOL_OF_SERVER_HARDWARE
         )
-        oneview_client.server_profile_template.list.return_value = (
-            POOL_OF_STUB_SERVER_PROFILE_TEMPLATE
+        oneview_client.server_profile_templates.get_all.return_value = (
+            POOL_OF_SERVER_PROFILE_TEMPLATE
+        )
+        oneview_client.server_hardware.get.return_value = (
+            POOL_OF_SERVER_HARDWARE[1]
         )
 
         spt_index = 0
@@ -573,11 +669,14 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
     ):
 
         oneview_client = mock_oneview_client.return_value
-        oneview_client.server_hardware.list.return_value = (
-            POOL_OF_STUB_SERVER_HARDWARE
+        oneview_client.server_hardware.get_all.return_value = (
+            POOL_OF_SERVER_HARDWARE
         )
-        oneview_client.server_profile_template.list.return_value = (
-            POOL_OF_STUB_SERVER_PROFILE_TEMPLATE
+        oneview_client.server_profile_templates.get_all.return_value = (
+            POOL_OF_SERVER_PROFILE_TEMPLATE
+        )
+        oneview_client.server_hardware.get.return_value = (
+            POOL_OF_SERVER_HARDWARE[1]
         )
 
         self.args.server_profile_template_name = (
@@ -592,8 +691,8 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
 
         create_node_cmd.do_node_create(self.args)
 
-        selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
-        selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
+        selected_sh = POOL_OF_SERVER_HARDWARE[sh_index]
+        selected_spt = POOL_OF_SERVER_PROFILE_TEMPLATE[spt_index]
 
         attrs = self._create_attrs_for_node(selected_sh, selected_spt)
 
@@ -606,11 +705,14 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
         self, mock_oneview_client, mock_ironic_client
     ):
         oneview_client = mock_oneview_client.return_value
-        oneview_client.server_hardware.list.return_value = (
-            POOL_OF_STUB_SERVER_HARDWARE
+        oneview_client.server_hardware.get_all.return_value = (
+            POOL_OF_SERVER_HARDWARE
         )
-        oneview_client.server_profile_template.list.return_value = (
-            POOL_OF_STUB_SERVER_PROFILE_TEMPLATE
+        oneview_client.server_profile_templates.get_all.return_value = (
+            POOL_OF_SERVER_PROFILE_TEMPLATE
+        )
+        oneview_client.server_hardware.get.return_value = (
+            POOL_OF_SERVER_HARDWARE[1]
         )
 
         self.args.server_profile_template_name = (
@@ -622,8 +724,8 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
 
         sh_index = 0
         spt_index = 0
-        selected_sh = POOL_OF_STUB_SERVER_HARDWARE[sh_index]
-        selected_spt = POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[spt_index]
+        selected_sh = POOL_OF_SERVER_HARDWARE[sh_index]
+        selected_spt = POOL_OF_SERVER_PROFILE_TEMPLATE[spt_index]
 
         attrs = self._create_attrs_for_node(selected_sh, selected_spt)
 
@@ -663,179 +765,6 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
         )
 
     @mock.patch('ironic_oneview_cli.common.input')
-    def test_node_migration(self, mock_input,
-                            mock_oneview_client,
-                            mock_ironic_client):
-        ironic_client = mock_ironic_client.return_value
-        ironic_client.node.list.return_value = (
-            POOL_OF_STUB_IRONIC_NODES[1],
-            POOL_OF_STUB_IRONIC_NODES[2]
-        )
-        oneview_client = mock_oneview_client.return_value
-        oneview_client.server_hardware.get.return_value = \
-            POOL_OF_STUB_SERVER_HARDWARE[1]
-
-        mock_input.side_effect = ['1', 'n']
-
-        update_patch_test = [{'op': 'add',
-                              'path': '/driver_info/dynamic_allocation',
-                              'value': True}]
-
-        migrate_node_cmd.do_migrate_to_dynamic(self.args)
-
-        self.assertEqual(2, ironic_client.node.set_maintenance.call_count)
-
-        ironic_client.node.update.assert_called_with(
-            POOL_OF_STUB_IRONIC_NODES[1].uuid,
-            update_patch_test
-        )
-
-    def test_node_migration_all(self, mock_oneview_client, mock_ironic_client):
-        ironic_client = mock_ironic_client.return_value
-        ironic_client.node.list.return_value = (
-            POOL_OF_STUB_IRONIC_NODES[1],
-            POOL_OF_STUB_IRONIC_NODES[2]
-        )
-        oneview_client = mock_oneview_client.return_value
-        oneview_client.server_hardware.get.return_value = \
-            POOL_OF_STUB_SERVER_HARDWARE[1]
-
-        update_patch_test = [{'op': 'add',
-                              'path': '/driver_info/dynamic_allocation',
-                              'value': True}]
-
-        sp_patch_test = [{'op': 'add',
-                          'path': '/driver_info/'
-                                  'applied_server_profile_uri',
-                          'value': '/rest/server-profile/1111-2222'}]
-        self.args.all = True
-
-        migrate_node_cmd.do_migrate_to_dynamic(self.args)
-
-        self.assertEqual(2, ironic_client.node.set_maintenance.call_count)
-
-        oneview_client.server_profile.delete.assert_called_with(
-            '1111-2222'
-        )
-
-        ironic_client.node.update.assert_any_call(
-            POOL_OF_STUB_IRONIC_NODES[1].uuid,
-            update_patch_test
-        )
-
-        ironic_client.node.update.assert_any_call(
-            POOL_OF_STUB_IRONIC_NODES[2].uuid,
-            sp_patch_test + update_patch_test
-        )
-
-    def test_node_migration_specific(self,
-                                     mock_oneview_client,
-                                     mock_ironic_client):
-        ironic_client = mock_ironic_client.return_value
-        ironic_client.node.get.return_value = (
-            POOL_OF_STUB_IRONIC_NODES[2]
-        )
-        oneview_client = mock_oneview_client.return_value
-        oneview_client.server_hardware.get.return_value = \
-            POOL_OF_STUB_SERVER_HARDWARE[1]
-
-        update_patch_test = [{'op': 'add',
-                              'path': '/driver_info/dynamic_allocation',
-                              'value': True}]
-
-        sp_patch_test = [{'op': 'add',
-                          'path': '/driver_info/'
-                                  'applied_server_profile_uri',
-                          'value': '/rest/server-profile/1111-2222'}]
-
-        self.args.nodes = '33333333-4444-8888-9999-000000000000'
-
-        migrate_node_cmd.do_migrate_to_dynamic(self.args)
-
-        ironic_client.node.set_maintenance.assert_not_called()
-
-        ironic_client.node.update.assert_called_with(
-            POOL_OF_STUB_IRONIC_NODES[2].uuid,
-            sp_patch_test + update_patch_test
-        )
-
-    def test_migration_dyalloc_and_maintenance_reason_not_none(
-            self,
-            mock_oneview_client,
-            mock_ironic_client):
-        ironic_client = mock_ironic_client.return_value
-        ironic_client.node.get.return_value = (
-            POOL_OF_STUB_IRONIC_NODES[4]
-        )
-
-        self.args.nodes = '33333333-4444-8888-9999-11111111111'
-
-        migrate_node_cmd.do_migrate_to_dynamic(self.args)
-
-        ironic_client.node.update.assert_not_called()
-
-        ironic_client.node.set_maintenance.assert_called_with(
-            POOL_OF_STUB_IRONIC_NODES[4].uuid,
-            False,
-            maint_reason=''
-        )
-
-    def test_migration_dyalloc_and_maintenance_reason_none(
-            self,
-            mock_oneview_client,
-            mock_ironic_client):
-
-        ironic_client = mock_ironic_client.return_value
-        ironic_client.node.get.return_value = (
-            POOL_OF_STUB_IRONIC_NODES[5]
-        )
-
-        self.args.nodes = '33333333-4444-8888-9999-22222222222'
-
-        migrate_node_cmd.do_migrate_to_dynamic(self.args)
-
-        ironic_client.node.update.assert_not_called()
-
-        ironic_client.node.set_maintenance.assert_not_called()
-
-    def test_migrate_with_server_profile_deleted(
-            self,
-            mock_oneview_client,
-            mock_ironic_client):
-
-        node = POOL_OF_STUB_IRONIC_NODES[6]
-        server_profile_uri = '/rest/server-profile/1111-2222'
-        node.server_profile_uri = server_profile_uri
-        POOL_OF_STUB_IRONIC_NODES[6] = node
-
-        update_patch_test = [{'op': 'add',
-                              'path': '/driver_info/dynamic_allocation',
-                              'value': True}]
-
-        ironic_client = mock_ironic_client.return_value
-        ironic_client.node.get.return_value = (
-            POOL_OF_STUB_IRONIC_NODES[6]
-        )
-        oneview_client = mock_oneview_client.return_value
-        oneview_client.server_hardware.get.return_value = \
-            POOL_OF_STUB_SERVER_HARDWARE[0]
-
-        self.args.nodes = '33333333-4444-8888-9999-22222222222'
-
-        migrate_node_cmd.do_migrate_to_dynamic(self.args)
-
-        oneview_client.server_profile.delete.assert_called_with(
-            None
-        )
-
-        self.assertRaises(ValueError)
-
-        ironic_client.node.update.assert_called_with(
-            POOL_OF_STUB_IRONIC_NODES[6].uuid,
-            update_patch_test
-        )
-
-    @mock.patch('ironic_oneview_cli.common.input')
     def test_delete_node(self, mock_input,
                          mock_oneview_client, mock_ironic_client):
         ironic_client = mock_ironic_client.return_value
@@ -846,34 +775,158 @@ class FunctionalTestIronicOneviewCli(unittest.TestCase):
 
         delete_node_cmd.do_node_delete(self.args)
 
-        self.assertEqual(7, ironic_client.node.delete.call_count)
+        self.assertEqual(8, ironic_client.node.delete.call_count)
+
+    def test_port_creation_no_args(
+        self, mock_oneview_client, mock_ironic_client
+    ):
+        server_hardware = POOL_OF_SERVER_HARDWARE[1]
+        ironic_node = POOL_OF_STUB_IRONIC_NODES[3]
+
+        oneview_client = mock_oneview_client.return_value
+        oneview_client.server_hardware.get.return_value = server_hardware
+        ironic_client = mock_ironic_client.return_value
+        ironic_client.node.get.return_value = ironic_node
+
+        self.args.node = ironic_node.uuid
+        port_create_cmd.do_port_create(self.args)
+
+        attrs = self._create_attrs_for_port(server_hardware, ironic_node)
+        ironic_client.port.create.assert_called_with(
+            **attrs
+        )
+
+    def test_port_creation_with_mac(
+        self, mock_oneview_client, mock_ironic_client
+    ):
+        server_hardware = POOL_OF_SERVER_HARDWARE[1]
+        ironic_node = POOL_OF_STUB_IRONIC_NODES[3]
+
+        oneview_client = mock_oneview_client.return_value
+        oneview_client.server_hardware.get.return_value = server_hardware
+        ironic_client = mock_ironic_client.return_value
+        ironic_client.node.get.return_value = ironic_node
+
+        self.args.node = ironic_node.uuid
+        self.args.mac = "01:23:45:67:89:ab"
+        port_create_cmd.do_port_create(self.args)
+
+        attrs = self._create_attrs_for_port(server_hardware, ironic_node,
+                                            self.args.mac)
+        ironic_client.port.create.assert_called_with(
+            **attrs
+        )
+
+    def test_port_creation_with_oneview_ml2_driver(
+        self, mock_oneview_client, mock_ironic_client
+    ):
+        server_hardware = POOL_OF_SERVER_HARDWARE[1]
+        ironic_node = POOL_OF_STUB_IRONIC_NODES[7]
+
+        oneview_client = mock_oneview_client.return_value
+        oneview_client.server_hardware.get.return_value = server_hardware
+        ironic_client = mock_ironic_client.return_value
+        ironic_client.node.get.return_value = ironic_node
+
+        self.args.node = ironic_node.uuid
+        port_create_cmd.do_port_create(self.args)
+
+        attrs = self._create_attrs_for_port(server_hardware, ironic_node)
+        ironic_client.port.create.assert_called_with(
+            **attrs
+        )
+
+    @mock.patch('ironic_oneview_cli.facade.Facade.'
+                'get_server_hardware_mac_from_ilo')
+    def test_port_creation_rack_server(
+        self, mock_mac_from_ilo, mock_oneview_client, mock_ironic_client
+    ):
+        server_hardware = POOL_OF_SERVER_HARDWARE[0]
+        ironic_node = POOL_OF_STUB_IRONIC_NODES[6]
+        mac = "aa:bb:cc:dd:ee:ff"
+
+        oneview_client = mock_oneview_client.return_value
+        oneview_client.server_hardware.get.return_value = server_hardware
+        ironic_client = mock_ironic_client.return_value
+        ironic_client.node.get.return_value = ironic_node
+        mock_mac_from_ilo.return_value = mac
+
+        self.args.node = ironic_node.uuid
+        port_create_cmd.do_port_create(self.args)
+
+        attrs = self._create_attrs_for_port(server_hardware, ironic_node, mac)
+        ironic_client.port.create.assert_called_with(
+            **attrs
+        )
+
+    def _create_attrs_for_port(self, server_hardware, ironic_node, mac=None):
+        if not mac:
+            device_slot = server_hardware.get("portMap").get("deviceSlots")[0]
+            physical_port = device_slot.get("physicalPorts")[0]
+            mac = physical_port.get("virtualPorts")[0].get("mac")
+
+        local_link_connection = {}
+        if ironic_node.driver_info.get('use_oneview_ml2_driver'):
+            server_hardware_uri = ironic_node.driver_info.get(
+                "server_hardware_uri")
+            server_hardware_id = server_hardware_uri.split("/")[-1]
+            switch_info = (
+                '{"server_hardware_id": "%(server_hardware_id)s", '
+                '"bootable": "%(bootable)s"}') % {
+                    'server_hardware_id': server_hardware_id,
+                    'bootable': True}
+            local_link_connection = {
+                "switch_id": "01:23:45:67:89:ab",
+                "port_id": "",
+                "switch_info": switch_info
+            }
+
+        attrs = {
+            'address': mac,
+            'node_uuid': ironic_node.uuid,
+            'portgroup_uuid': None,
+            "local_link_connection": local_link_connection,
+            'pxe_enabled': True
+        }
+
+        return attrs
 
     def _create_attrs_for_node(self, server_hardware, server_profile_template):
+        cpus = (server_hardware.get("processorCount") *
+                server_hardware.get("processorCoreCount"))
         attrs = {
-            'driver': STUB_PARAMETERS.os_ironic_node_driver,
             'driver_info': {
-                'dynamic_allocation': True,
                 'use_oneview_ml2_driver': self.args.use_oneview_ml2_driver,
                 'deploy_kernel': STUB_PARAMETERS.os_ironic_deploy_kernel_uuid,
                 'deploy_ramdisk':
                     STUB_PARAMETERS.os_ironic_deploy_ramdisk_uuid,
                 'server_hardware_uri':
-                    server_hardware.uri,
+                    server_hardware.get("uri"),
             },
             'properties': {
-                'cpus': server_hardware.cpus,
-                'memory_mb': server_hardware.memory_mb,
-                'local_gb': server_hardware.local_gb,
-                'cpu_arch': server_hardware.cpu_arch,
+                'cpus': cpus,
+                'memory_mb': server_hardware.get("memoryMb"),
+                'local_gb': server_hardware.get("local_gb"),
+                'cpu_arch': server_hardware.get("cpu_arch"),
                 'capabilities':
                     'server_hardware_type_uri:%s,'
                     'server_profile_template_uri:%s,'
                     'enclosure_group_uri:%s' % (
-                        server_hardware.server_hardware_type_uri,
-                        server_profile_template.uri,
-                        server_hardware.enclosure_group_uri
+                        server_hardware.get("serverHardwareTypeUri"),
+                        server_profile_template.get("uri"),
+                        server_hardware.get("serverGroupUri")
                     )
             }
         }
+        if self.args.classic:
+            attrs['driver'] = STUB_PARAMETERS.os_ironic_node_driver
+        else:
+            attrs['driver'] = STUB_PARAMETERS.os_driver
+            attrs['power_interface'] = STUB_PARAMETERS.os_power_interface
+            attrs['management_interface'] = (
+                STUB_PARAMETERS.os_management_interface
+            )
+            attrs['inspect_interface'] = STUB_PARAMETERS.os_inspect_interface
+            attrs['deploy_interface'] = STUB_PARAMETERS.os_deploy_interface
 
         return attrs

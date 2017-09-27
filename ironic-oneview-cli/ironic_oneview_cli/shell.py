@@ -1,5 +1,5 @@
-# Copyright 2015 Hewlett-Packard Development Company, L.P.
-# Copyright 2015 Universidade Federal de Campina Grande
+# Copyright (2015-2017) Hewlett Packard Enterprise Development LP
+# Copyright (2015-2017) Universidade Federal de Campina Grande
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -13,9 +13,8 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-"""
-Command-line interface to the Ironic - HP OneView drivers.
-"""
+
+"""Command-line interface to the Ironic - HP OneView drivers."""
 
 from __future__ import print_function
 import argparse
@@ -30,20 +29,20 @@ from ironic_oneview_cli.create_flavor_shell import (
     commands as flavor_create_commands)
 from ironic_oneview_cli.create_node_shell import (
     commands as node_create_commands)
+from ironic_oneview_cli.create_port_shell import (
+    commands as port_create_commands)
 from ironic_oneview_cli.delete_node_shell import (
     commands as node_delete_commands)
 from ironic_oneview_cli import exceptions
 from ironic_oneview_cli.genrc import commands as genrc_commands
-from ironic_oneview_cli.migrate_node_shell import (
-    commands as node_migrate_commands)
 from ironic_oneview_cli import service_logging as logging
 
-VERSION = '0.6.0'
+VERSION = '2.0.0'
 
 COMMAND_MODULES = [
     node_create_commands,
     flavor_create_commands,
-    node_migrate_commands,
+    port_create_commands,
     node_delete_commands,
     genrc_commands
 ]
@@ -55,7 +54,7 @@ class IronicOneView(object):
         parser = argparse.ArgumentParser(
             prog='ironic-oneview',
             description=__doc__.strip(),
-            epilog='See "ironic-oneview --help COMMAND" '
+            epilog='See "ironic-oneview SUBCOMMAND --help" '
                    'for help on a specific command.',
             add_help=False,
             formatter_class=HelpFormatter,
@@ -181,10 +180,10 @@ class IronicOneView(object):
 
         parser.add_argument('--ironic-api-version',
                             default=common.env(
-                                'IRONIC_API_VERSION', default='1.22'),
+                                'IRONIC_API_VERSION', default='1.31'),
                             help='Accepts 1.x (where "x" is microversion) '
                                  'or "latest", Defaults to '
-                                 'env[IRONIC_API_VERSION] or 1.22')
+                                 'env[IRONIC_API_VERSION] or 1.31')
 
         parser.add_argument('--ironic_api_version',
                             help=argparse.SUPPRESS)
@@ -268,50 +267,6 @@ class IronicOneView(object):
         parser.add_argument('--ov_auth_url',
                             help=argparse.SUPPRESS)
 
-        parser.add_argument('--ov-cacert',
-                            metavar='<ov-ca-bundle-file>',
-                            default=common.env('OV_CACERT'),
-                            help='Path to OneView CA certificate bundle file. '
-                                 'Defaults to env[OV_CACERT]')
-
-        parser.add_argument('--ov_cacert',
-                            help=argparse.SUPPRESS)
-
-        parser.add_argument('--ov-max-polling-attempts', type=int,
-                            default=common.env(
-                                'OV_MAX_POLLING_ATTEMPTS', default=12),
-                            help='Max connection retries on OneView. '
-                                 'Defaults to env[OV_MAX_POLLING_ATTEMPTS]')
-
-        parser.add_argument('--ov_max_polling_attempts',
-                            help=argparse.SUPPRESS)
-
-        parser.add_argument('--ov-audit',
-                            default=common.env('OV_AUDIT', default=False),
-                            help='Enable OneView audit. '
-                                 'Defaults to env[OV_AUDIT]')
-
-        parser.add_argument('--ov_audit',
-                            help=argparse.SUPPRESS)
-
-        parser.add_argument('--ov-audit-input',
-                            metavar='<ov-audit-input-file>',
-                            default=common.env('OV_AUDIT_INPUT'),
-                            help='Path to OneView audit input file. '
-                                 'Defaults to env[OV_AUDIT_INPUT]')
-
-        parser.add_argument('--ov_audit_input',
-                            help=argparse.SUPPRESS)
-
-        parser.add_argument('--ov-audit-output',
-                            metavar='<ov-audit-output-file>',
-                            default=common.env('OV_AUDIT_OUTPUT'),
-                            help='Path to OneView audit output file. '
-                                 'Defaults to env[OV_AUDIT_OUTPUT]')
-
-        parser.add_argument('--ov_audit_output',
-                            help=argparse.SUPPRESS)
-
         # OpenStack Images arguments
         parser.add_argument('--os-ironic-node-driver',
                             default=common.env('OS_IRONIC_NODE_DRIVER'),
@@ -319,6 +274,46 @@ class IronicOneView(object):
                                  'Defaults to env[OS_IRONIC_NODE_DRIVER]')
 
         parser.add_argument('--os_ironic_node_driver',
+                            help=argparse.SUPPRESS)
+
+        parser.add_argument('--os-driver',
+                            default=common.env('OS_DRIVER'),
+                            help='Hardware type for node creation. '
+                                 'Defaults to env[OS_DRIVER]')
+
+        parser.add_argument('--os_driver',
+                            help=argparse.SUPPRESS)
+
+        parser.add_argument('--os-power-interface',
+                            default=common.env('OS_POWER_INTERFACE'),
+                            help='Power interface for node creation. '
+                                 'Defaults to env[OS_POWER_INTERFACE]')
+
+        parser.add_argument('--os_power_interface',
+                            help=argparse.SUPPRESS)
+
+        parser.add_argument('--os-management-interface',
+                            default=common.env('OS_MANAGEMENT_INTERFACE'),
+                            help='Management interface for node creation. '
+                                 'Defaults to env[OS_MANAGEMENT_INTERFACE]')
+
+        parser.add_argument('--os_management_interface',
+                            help=argparse.SUPPRESS)
+
+        parser.add_argument('--os-inspect-interface',
+                            default=common.env('OS_INSPECT_INTERFACE'),
+                            help='Inspect interface for node creation. '
+                                 'Defaults to env[OS_INSPECT_INTERFACE]')
+
+        parser.add_argument('--os_inspect_interface',
+                            help=argparse.SUPPRESS)
+
+        parser.add_argument('--os-deploy-interface',
+                            default=common.env('OS_DEPLOY_INTERFACE'),
+                            help='Deploy interface for node creation. '
+                                 'Defaults to env[OS_DEPLOY_INTERFACE]')
+
+        parser.add_argument('--os_deploy_interface',
                             help=argparse.SUPPRESS)
 
         parser.add_argument(
@@ -357,7 +352,7 @@ class IronicOneView(object):
         nargs='?',
         help='Display help for <subcommand>')
     def do_help(self, args):
-        """Displays help about this program or one of its subcommands."""
+        """Display help about this program or one of its subcommands."""
         if getattr(args, 'command', None):
             if args.command in self.subcommands:
                 self.subcommands[args.command].print_help()
@@ -376,11 +371,12 @@ class IronicOneView(object):
         if options.debug:
             logging.debug_activate_handlers(options.debug)
 
-        if options.help or not argv:
+        if options.help and not args:
             self.do_help(options)
             return 0
 
         args = subcommand_parser.parse_args(argv)
+
         # Short-circuit and deal with these commands right away.
         if args.func == self.do_help:
             self.do_help(args)
@@ -430,11 +426,35 @@ class IronicOneView(object):
                                           "either --ov-auth-url or via "
                                           "env[OV_AUTH_URL]")
 
-        if not args.os_ironic_node_driver:
-            raise exceptions.CommandError("You must provide an node driver "
-                                          "via either "
-                                          "--os-ironic-node-driver or via "
-                                          "env[OS_IRONIC_NODE_DRIVER]")
+        if not (args.os_ironic_node_driver or args.os_driver):
+            print("You must provide an node driver or hardware type "
+                  "respectively via either "
+                  "--os-ironic-node-driver or env[OS_IRONIC_NODE_DRIVER] "
+                  "--driver or env[OS_DRIVER]")
+
+        if not args.os_power_interface:
+            raise exceptions.CommandError("You must provide an node "
+                                          "power interface via either "
+                                          "--os-power-interface "
+                                          "env[OS_POWER_INTERFACE]")
+
+        if not args.os_management_interface:
+            raise exceptions.CommandError("You must provide an node "
+                                          "management interface via either "
+                                          "--os-management-interface "
+                                          "env[OS_MANAGEMENT_INTERFACE")
+
+        if not args.os_inspect_interface:
+            raise exceptions.CommandError("You must provide an node "
+                                          "inspect interface via either "
+                                          "--os-inspect-interface "
+                                          "env[OS_INSPECT_INTERFACE]")
+
+        if not args.os_deploy_interface:
+            raise exceptions.CommandError("You must provide an node "
+                                          "deploy interface via either "
+                                          "--os-deploy-interface "
+                                          "env[OS_DEPLOY_INTERFACE]")
 
         if not args.os_ironic_deploy_kernel_uuid:
             raise exceptions.CommandError(
@@ -469,12 +489,14 @@ class IronicOneView(object):
             'os_username', 'os_password', 'os_tenant_id', 'os_tenant_name',
             'os_project_id', 'os_project_name', 'os_cert', 'os_cacert',
             'os_auth_url', 'ov_username', 'ov_password', 'ov_auth_url',
-            'ov_cacert', 'insecure', 'debug', 'ov_max_polling_attempts',
-            'os_ironic_node_driver', 'os_ironic_deploy_kernel_uuid',
+            'insecure', 'debug', 'os_inspection_enabled', 'os_endpoint_type',
+            'os_ironic_node_driver', 'os_driver', 'os_power_interface',
+            'os_management_interface', 'os_inspect_interface',
+            'os_deploy_interface', 'os_ironic_deploy_kernel_uuid',
             'os_ironic_deploy_ramdisk_uuid', 'ironic_url', 'os_region_name',
-            'ironic_api_version', 'os_service_type', 'os_endpoint_type',
+            'ironic_api_version', 'os_service_type', 'os_project_domain_id',
             'os_user_domain_id', 'os_user_domain_name', 'os_project_domain_id',
-            'os_project_domain_name', 'os_inspection_enabled'
+            'os_project_domain_name'
         )
 
         kwargs = {}
@@ -492,7 +514,7 @@ class IronicOneView(object):
 
 
 def define_command(subparsers, command, callback, cmd_mapper):
-    """Defines a command in the subparsers collection.
+    """Define a command in the subparsers collection.
 
     :param subparsers: subparsers collection where the command will go
     :param command: command name
@@ -516,8 +538,7 @@ def define_command(subparsers, command, callback, cmd_mapper):
 
 
 def define_commands_from_module(subparsers, command_module, cmd_mapper):
-    """Adds *do_* methods in a module and add as commands into a subparsers."""
-
+    """Add *do_* methods in a module and add as commands into a subparsers."""
     for method_name in (a for a in dir(command_module) if a.startswith('do_')):
         # Commands should be hypen-separated instead of underscores.
         command = method_name[3:].replace('_', '-')

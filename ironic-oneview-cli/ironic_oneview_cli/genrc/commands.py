@@ -1,5 +1,5 @@
-# Copyright 2015 Hewlett-Packard Development Company, L.P.
-# Copyright 2015 Universidade Federal de Campina Grande
+# Copyright (2015-2017) Hewlett Packard Enterprise Development LP
+# Copyright (2015-2017) Universidade Federal de Campina Grande
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -23,29 +23,11 @@ def do_genrc(args):
     # OneView
 
     print("\n# OneView HPE Authentication URL.")
+    print("# Only the domain, without https:// or http://.")
     print("#export OV_AUTH_URL=")
 
     print("\n# OneView HPE username.")
     print("#export OV_USERNAME=")
-
-    print("\n# Path to OneView CA certificate bundle file."
-          " (only for secure connmections)")
-    print("#export OV_CACERT=")
-
-    print("\n# Max connection retries to check change on OneView HPE.")
-    print("#export OV_MAX_POLLING_ATTEMPTS=12")
-
-    print("\n# Enable OneView Audit Logging.")
-    print("#export OV_AUDIT=False")
-
-    print("\n# Path to map file for OneView audit cases. \n"
-          "# Used only when OneView API audit is enabled. \n"
-          "# See: https://github.com/openstack/python-oneviewclient")
-    print("#export OV_AUDIT_INPUT=")
-
-    print("\n# Path to OneView audit output file. (json format) \n"
-          "# Created only when Oneview API audit is enabled.")
-    print("#export OV_AUDIT_OUTPUT=")
 
     print("\n# Pass the OneView HPE password when executed.")
     print("echo \"Please enter your HP OneView password: \"")
@@ -67,5 +49,31 @@ def do_genrc(args):
 
     print(
         "\n# OneView Ironic driver for node creation. \n"
+        "# Classic Drivers will be deprecated on Queens. \n"
         "# Allowed values: agent_pxe_oneview, iscsi_pxe_oneview, fake_oneview")
     print("#export OS_IRONIC_NODE_DRIVER=agent_pxe_oneview")
+
+    print(
+        "\n# OpenStack Ironic Driver for node creation. \n"
+        "# Allowed values: oneview")
+    print("#export OS_DRIVER=oneview")
+
+    print(
+        "\n# OpenStack Ironic Power interface for node creation. \n"
+        "# Allowed values: oneview")
+    print("#export OS_POWER_INTERFACE=oneview")
+
+    print(
+        "\n# OpenStack Ironic Management interface for node creation. \n"
+        "# Allowed values: oneview")
+    print("#export OS_MANAGEMENT_INTERFACE=oneview")
+
+    print(
+        "\n# OpenStack Ironic Inspect interface for node creation. \n"
+        "# Allowed values: oneview")
+    print("#export OS_INSPECT_INTERFACE=oneview")
+
+    print(
+        "\n# OpenStack Ironic Deploy interface for node creation. \n"
+        "# Allowed values: oneview-direct, oneview-iscsi")
+    print("#export OS_DEPLOY_INTERFACE=oneview-direct")

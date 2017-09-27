@@ -8,16 +8,11 @@ Overview
 Ironic-OneView CLI is a command line interface tool for easing the use of the
 OneView Drivers for Ironic. It allows the user to easily create and configure
 Ironic nodes compatible with OneView ``Server Hardware`` objects and create
-Nova flavors to match available Ironic nodes that use OneView drivers. It also
-offers the option to migrate Ironic nodes using pre-allocation model to the
-dynamic allocation model.
+Nova flavors to match available Ironic nodes that use OneView drivers.
 
 This tool creates Ironic nodes based on the Ironic OneView drivers' dynamic
 allocation model [1]_ [2]_.
 
-.. note::
-   If you still want to use the deprecated pre-allocation model instead, use
-   version 0.0.2 of this tool.
 .. note::
    This tool works with OpenStack Identity API v2.0 and v3.
 .. note::
@@ -70,8 +65,6 @@ In the current version of Ironic-OneView CLI, the available subcommands are:
 |     node-create    | Creates nodes based on available HPE OneView Server Hardware. |
 +--------------------+---------------------------------------------------------------+
 |    flavor-create   | Creates flavors based on available Ironic nodes.              |
-+--------------------+---------------------------------------------------------------+
-| migrate-to-dynamic | Migrate Ironic nodes to dynamic allocation model.             |
 +--------------------+---------------------------------------------------------------+
 |        genrc       | Generates a sample Ironic-OneView CLI RC file.                |
 +--------------------+---------------------------------------------------------------+
@@ -151,6 +144,26 @@ command to add this information in the node driver_info::
 
 For more information on *Networking OneView ML2 Driver*, see [5]_.
 
+With the Driver composition reform, the default behavior is to create a node
+using a dynamic driver. With this feature, new interfaces are added to the
+node, such as: ``Openstack Driver``, ``Openstack Power Interface``,
+``Openstack Management Interface``, ``Openstack Inspect Interface``,
+``Openstack Deploy Interface``.
+
+If you want to create a node and set this new interfaces, use the following
+command:
+
+    $ ironic-oneview node-create --os-driver oneview --os-power-interface oneview
+      --os-management-interface oneview --os-inspect-interface oneview
+      -- os-deploy-interface oneview-direct
+
+If you want to create the node using the classic driver, use the following
+command:
+
+    $ ironic-oneview node-create --classic
+
+For more information on the *Driver composition reform*, see [6]_.
+
 ----
 
 To list all nodes in Ironic, use the command::
@@ -193,43 +206,6 @@ For more information about the created Nova flavor, use the command::
     $ nova flavor-show <flavor>
 
 
-Node migration
-^^^^^^^^^^^^^^
-
-To migrate pre-allocation Ironic nodes to the Ironic OneView drivers' dynamic
-allocation model, use the following command::
-
-    $ ironic-oneview migrate-to-dynamic
-
-The tool will prompt you to choose the available pre-allocation nodes to
-migrate, those retrieved from Ironic.::
-
-    Retrieving pre-allocation Nodes from Ironic...
-    +----+--------------------------------------+----------------------+---------------------------+--------------------+
-    | Id | Node UUID                            | Server Hardware Name | Server Hardware Type Name | Enclose Group Name |
-    +----+--------------------------------------+----------------------+---------------------------+--------------------+
-    | 1  | 607e269f-155e-443e-83af-d3a553c8b535 | Encl1, bay 6         | BL460c Gen8 1             | VirtualEnclosure   |
-    | 2  | 3ca132c0-0769-48d1-a2af-9a67f363345e | Encl1, bay 7         | BL460c Gen8 1             | VirtualEnclosure   |
-    | 3  | e9eb685d-cb46-4645-9980-f27b44e472f9 | Encl1, bay 8         | BL460c Gen8 1             | VirtualEnclosure   |
-    +----+--------------------------------------+----------------------+---------------------------+--------------------+
-
-Once you have chosen a valid pre-allocation node ID, the tool will migrate the
-node to dynamic allocation model. Notice that you can migrate multiple nodes at
-once. For that, type multiple nodes ``Id`` separated by blank spaces or type
-``all`` to migrate all nodes shown at once.
-
-----
-
-To migrate one or more specific pre-allocation node(s), without showing the
-table of pre-allocation nodes available, use the command::
-
-    $ ironic-oneview migrate-to-dynamic --nodes <node_uuid> [<node_uuid> ...]
-
-To migrate all available pre-allocation nodes at once, without showing the
-table of pre-allocation nodes available, use the command::
-
-    $ ironic-oneview migrate-to-dynamic --all
-
 Node delete
 ^^^^^^^^^^^
 
@@ -249,3 +225,4 @@ References
 .. [3] HPE OneView - https://www.hpe.com/us/en/integrated-systems/software.html
 .. [4] OpenStack RC - http://docs.openstack.org/user-guide/common/cli_set_environment_variables_using_openstack_rc.html
 .. [5] Networking OneView ML2 Driver - https://github.com/HewlettPackard/ironic-driver-oneview/tree/master/networking-oneview
+.. [6] Driver Composition Reform - https://specs.openstack.org/openstack/ironic-specs/specs/approved/driver-composition-reform.html

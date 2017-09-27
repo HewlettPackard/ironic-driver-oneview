@@ -1,5 +1,5 @@
-# Copyright 2016 Hewlett-Packard Development Company, L.P.
-# Copyright 2016 Universidade Federal de Campina Grande
+# Copyright (2016-2017) Hewlett Packard Enterprise Development LP
+# Copyright (2016-2017) Universidade Federal de Campina Grande
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -126,9 +126,19 @@ class StubParameters(object):
 
     def __init__(self,
                  os_ironic_node_driver,
+                 os_driver,
+                 os_power_interface,
+                 os_management_interface,
+                 os_inspect_interface,
+                 os_deploy_interface,
                  os_ironic_deploy_kernel_uuid,
                  os_ironic_deploy_ramdisk_uuid):
 
         self.os_ironic_node_driver = os_ironic_node_driver
+        self.os_driver = os_driver
+        self.os_power_interface = os_power_interface
+        self.os_management_interface = os_management_interface
+        self.os_inspect_interface = os_inspect_interface
+        self.os_deploy_interface = os_deploy_interface
         self.os_ironic_deploy_kernel_uuid = os_ironic_deploy_kernel_uuid
         self.os_ironic_deploy_ramdisk_uuid = os_ironic_deploy_ramdisk_uuid

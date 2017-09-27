@@ -1,5 +1,5 @@
-# Copyright 2016 Hewlett-Packard Development Company, L.P.
-# Copyright 2016 Universidade Federal de Campina Grande
+# Copyright (2016-2017) Hewlett Packard Enterprise Development LP
+# Copyright (2016-2017) Universidade Federal de Campina Grande
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -17,6 +17,7 @@
 import mock
 import unittest
 
+from ironic_oneview_cli import common
 from ironic_oneview_cli.create_flavor_shell import (
     commands as create_flavor_cmd)
 from ironic_oneview_cli.create_flavor_shell import (
@@ -24,8 +25,6 @@ from ironic_oneview_cli.create_flavor_shell import (
 from ironic_oneview_cli.create_node_shell import (
     commands as create_node_cmd)
 from ironic_oneview_cli import facade
-from ironic_oneview_cli.migrate_node_shell import (
-    commands as migrate_node_cmd)
 from ironic_oneview_cli.tests import stubs
 
 POOL_OF_STUB_IRONIC_NODES = [
@@ -42,9 +41,8 @@ POOL_OF_STUB_IRONIC_NODES = [
              'address': 'AA:BB:CC:DD:EE:FF',
              'extra': {}}
         ],
-        driver='fake_oneview',
+        driver='agent_pxe_oneview',
         driver_info={'user': 'foo',
-                     'dynamic_allocation': True,
                      'password': 'bar'},
         properties={'num_cpu': 4},
         name='fake-node-1',
@@ -63,7 +61,7 @@ POOL_OF_STUB_IRONIC_NODES = [
              'address': 'AA:BB:CC:DD:EE:FF',
              'extra': {}}
         ],
-        driver='fake_oneview',
+        driver='iscsi_pxe_oneview',
         driver_info={'server_hardware_uri': "/rest/server-hardware/22222",
                      'user': 'foo',
                      'password': 'bar'},
@@ -82,7 +80,6 @@ POOL_OF_STUB_IRONIC_NODES = [
         driver='fake_oneview',
         driver_info={'server_hardware_uri': "/rest/server-hardware/33333",
                      'user': 'foo',
-                     'dynamic_allocation': False,
                      'password': 'bar'},
         properties={'cpu_arch': 'x86_64',
                     'capabilities': 'server_hardware_type_uri:'
@@ -111,69 +108,135 @@ POOL_OF_STUB_IRONIC_NODES = [
         properties={'num_cpu': 4},
         name='fake-node-4',
         extra={}
-    )
-]
-
-STUB_ENCLOSURE_GROUP = stubs.StubEnclosureGroup(
-    name='ENCLGROUP',
-    uuid='22222222-TTTT-BBBB-9999-AAAAAAAAAAA',
-    uri='/rest/server-hardware/22222222-TTTT-BBBB-9999-AAAAAAAAAAA',
-)
-
-STUB_SERVER_HARDWARE_TYPE = stubs.StubServerHardwareType(
-    name='TYPETYPETYPE',
-    uuid='22222222-7777-8888-9999-AAAAAAAAAAA',
-    uri='/rest/server-hardware/22222222-7777-8888-9999-AAAAAAAAAAA',
-)
-
-POOL_OF_STUB_SERVER_HARDWARE = [
-    stubs.StubServerHardware(
-        name='AAAAA',
-        uuid='11111111-7777-8888-9999-000000000000',
-        uri='/rest/server-hardware/11111',
-        power_state='Off',
-        server_profile_uri='1111-2222-3333',
-        server_hardware_type_uri='/rest/server-hardware-types/111112222233333',
-        enclosure_group_uri='/rest/enclosure-groups/1111112222233333',
-        status='OK',
-        state='Unknown',
-        state_reason='',
-        enclosure_uri='/rest/enclosures/1111112222233333',
-        processor_count=12,
-        processor_core_count=12,
-        memory_mb=16384,
-        port_map=[],
-        mp_host_info={}
     ),
-    stubs.StubServerHardware(
-        name='AAAAA',
-        uuid='22222222-7777-8888-9999-000000000000',
-        uri='/rest/server-hardware/22222',
-        power_state='Off',
-        server_profile_uri='',
-        server_hardware_type_uri='/rest/server-hardware-types/111111222233333',
-        enclosure_group_uri='/rest/enclosure-groups/1111112222233333',
-        status='OK',
-        state='Unknown',
-        state_reason='',
-        enclosure_uri='/rest/enclosures/1111112222233333',
-        processor_count=12,
-        processor_core_count=12,
-        memory_mb=16384,
-        port_map=[],
-        mp_host_info={}
+    stubs.StubIronicNode(
+        id=5,
+        uuid='33333333-2222-8888-9999-000000000000',
+        chassis_uuid='aaaaaaaa-1111-bbbb-2222-cccccccccccc',
+        maintenance=False,
+        provision_state='enroll',
+        ports=[{}],
+        driver='oneview',
+        driver_info={'server_hardware_uri': "/rest/server-hardware/33333",
+                     'user': 'foo',
+                     'password': 'bar'},
+        properties={'cpu_arch': 'x86_64',
+                    'capabilities': 'server_hardware_type_uri:'
+                                    '/rest/server-hardware-types/'
+                                    '61720699-7D89-4E3E-BFC4-32FB9BBE2E71/'
+                                    'enclosure_group_uri:'
+                                    '/rest/enclosure-groups/'
+                                    'c02d2e96-6142-49d6-bd38-0ce9d371e94f'
+                                    'server_profile_template_uri:'
+                                    '/rest/server-profile-templates/'
+                                    '40ca74f8-65af-419a-b0cc-76af12b4f908'},
+        name='fake-node-5',
+        extra={}
     )
 ]
 
-POOL_OF_STUB_SERVER_PROFILE_TEMPLATE = [
-    stubs.StubServerProfileTemplate(
-        uri='/rest/server-profile-templates/1111112222233333',
-        name='TEMPLATETEMPLATETEMPLATE',
-        server_hardware_type_uri='/rest/server-hardware-types/111112222233333',
-        enclosure_group_uri='/rest/enclosure-groups/1111112222233333',
-        connections=[],
-        boot={}
-    )
+ENCLOSURE_GROUP = {
+    "name": 'ENCLGROUP',
+    "uuid": '22222222-TTTT-BBBB-9999-AAAAAAAAAAA',
+    "uri": '/rest/server-hardware/22222222-TTTT-BBBB-9999-AAAAAAAAAAA',
+}
+
+SERVER_HARDWARE_TYPE = {
+    "name": 'TYPETYPETYPE',
+    "uuid": '22222222-7777-8888-9999-AAAAAAAAAAA',
+    "uri": '/rest/server-hardware/22222222-7777-8888-9999-AAAAAAAAAAA',
+}
+
+POOL_OF_SERVER_HARDWARE = [
+    {
+        'name': 'AAAAA',
+        'uuid': '11111111-7777-8888-9999-000000000000',
+        'uri': '/rest/server-hardware/11111',
+        'powerState': 'Off',
+        'serverProfileUri': '',
+        'serverHardwareTypeUri':
+            '/rest/server-hardware-types/111112222233333',
+        'serverGroupUri': '/rest/enclosure-groups/1111112222233333',
+        'status': 'OK',
+        'state': 'Unknown',
+        'stateReason': '',
+        'locationUri': '/rest/enclosures/1111112222233333',
+        'processorCount': 12,
+        'processorCoreCount': 12,
+        'memoryMb': 16384,
+        'portMap': {},
+        'mpHostInfo': {}
+    },
+    {
+        'name': 'BBBBB',
+        'uuid': '22222222-7777-8888-9999-000000000000',
+        'uri': '/rest/server-hardware/22222',
+        'powerState': 'Off',
+        'serverProfileUri': '/rest/server-profile/1111-2222',
+        'serverHardwareTypeUri':
+            '/rest/server-hardware-types/111111222233333',
+        'serverGroupUri': '/rest/enclosure-groups/1111112222233333',
+        'status': 'OK',
+        'state': 'Unknown',
+        'stateReason': '',
+        'locationUri': '/rest/enclosures/1111112222233333',
+        'processorCount': 12,
+        'processorCoreCount': 12,
+        'memoryMb': 16384,
+        'portMap': {},
+        'mpHostInfo': {}
+    },
+    {
+        'name': 'CCCCC',
+        'uuid': '33333333-7777-8888-9999-000000000000',
+        'uri': '/rest/server-hardware/33333',
+        'powerState': 'Off',
+        'serverProfileUri': '',
+        'serverHardwareTypeUri':
+            '/rest/server-hardware-types/111111222223333',
+        'serverGroupUri': '/rest/enclosure-groups/1111112222233333',
+        'status': 'OK',
+        'state': 'Unknown',
+        'stateReason': '',
+        'locationUri': '/rest/enclosures/1111112222233333',
+        'processorCount': 12,
+        'processorCoreCount': 12,
+        'memoryMb': 16384,
+        'portMap': {},
+        'mpHostInfo': {}
+    },
+    {
+        'name': 'RackServer',
+        'uuid': '33333333-7777-8888-9999-111111',
+        'uri': '/rest/server-hardware/44444',
+        'powerState': 'Off',
+        'serverProfileUri': '',
+        'serverHardwareTypeUri':
+            '/rest/server-hardware-types/111111222223333',
+        'serverGroupUri': None,
+        'status': 'OK',
+        'state': 'Unknown',
+        'stateReason': '',
+        'locationUri': None,
+        'processorCount': 12,
+        'processorCoreCount': 12,
+        'memoryMb': 16384,
+        'portMap': {},
+        'mpHostInfo': {}
+    }
+]
+
+
+POOL_OF_SERVER_PROFILE_TEMPLATE = [
+    {
+        'uri': '/rest/server-profile-templates/1111112222233333',
+        'name': 'TEMPLATETEMPLATETEMPLATE',
+        'serverHardwareTypeUri':
+            '/rest/server-hardware-types/111111222223333',
+        'enclosureGroupUri': '/rest/enclosure-groups/1111112222233333',
+        'connections': [],
+        'boot': {}
+    }
 ]
 
 POOL_OF_STUB_NOVA_FLAVORS = [
@@ -203,17 +266,15 @@ POOL_OF_STUB_NOVA_FLAVORS = [
 
 @mock.patch('ironic_oneview_cli.facade.Facade')
 class UnitTestIronicOneviewCli(unittest.TestCase):
-
     @mock.patch.object(facade.Facade, 'get_ironic_node_list')
     def test_get_oneview_nodes(self, mock_ironic_node_list, mock_facade):
-        node_creator = create_node_cmd.NodeCreator(mock_facade)
         ironic_nodes = POOL_OF_STUB_IRONIC_NODES
         mock_ironic_node_list.return_value = ironic_nodes
         mock_facade.get_ironic_node_list = mock_ironic_node_list
-        oneview_nodes = node_creator.get_oneview_nodes()
+        oneview_nodes = common.get_oneview_nodes(ironic_nodes)
 
-        self.assertEqual(4, len(ironic_nodes))
-        self.assertEqual(3, len(list(oneview_nodes)))
+        self.assertEqual(5, len(ironic_nodes))
+        self.assertEqual(4, len(list(oneview_nodes)))
 
     @mock.patch.object(facade.Facade, 'get_ironic_node_list')
     def test_is_enrolled_on_ironic(self, mock_ironic_node_list, mock_facade):
@@ -221,7 +282,7 @@ class UnitTestIronicOneviewCli(unittest.TestCase):
         ironic_nodes = POOL_OF_STUB_IRONIC_NODES
         mock_ironic_node_list.return_value = ironic_nodes
         mock_facade.get_ironic_node_list = mock_ironic_node_list
-        server_hardware = POOL_OF_STUB_SERVER_HARDWARE[1]
+        server_hardware = POOL_OF_SERVER_HARDWARE[1]
 
         self.assertTrue(node_creator.is_enrolled_on_ironic(server_hardware))
 
@@ -233,121 +294,49 @@ class UnitTestIronicOneviewCli(unittest.TestCase):
         ironic_nodes = POOL_OF_STUB_IRONIC_NODES
         mock_ironic_node_list.return_value = ironic_nodes
         mock_facade.get_ironic_node_list = mock_ironic_node_list
-        server_hardware = POOL_OF_STUB_SERVER_HARDWARE[0]
-
+        server_hardware = POOL_OF_SERVER_HARDWARE[0]
         self.assertFalse(node_creator.is_enrolled_on_ironic(server_hardware))
 
     def test_is_server_profile_applied(self, mock_facade):
         node_creator = create_node_cmd.NodeCreator(mock_facade)
 
         self.assertTrue(node_creator.is_server_profile_applied(
-            POOL_OF_STUB_SERVER_HARDWARE[0]))
+            POOL_OF_SERVER_HARDWARE[1]))
 
     def test_is_server_profile_applied_false(self, mock_facade):
         node_creator = create_node_cmd.NodeCreator(mock_facade)
 
         self.assertFalse(node_creator.is_server_profile_applied(
-            POOL_OF_STUB_SERVER_HARDWARE[1]))
+            POOL_OF_SERVER_HARDWARE[0]))
 
-    @mock.patch.object(facade.Facade, 'get_ironic_node_list')
-    def test_list_server_hardware(self, mock_ironic_node_list, mock_facade):
-        node_creator = create_node_cmd.NodeCreator(mock_facade)
-        ironic_nodes = POOL_OF_STUB_IRONIC_NODES
-        mock_ironic_node_list.return_value = ironic_nodes
-        mock_facade.get_ironic_node_list = mock_ironic_node_list
-        mock_facade.list_server_hardware_available.return_value = (
-            POOL_OF_STUB_SERVER_HARDWARE
+    def test_list_server_hardware(self, mock_facade):
+        mock_facade.filter_server_hardware_available.return_value = (
+            POOL_OF_SERVER_HARDWARE
         )
+        server_hardware_objects = (
+            mock_facade.filter_server_hardware_available())
 
-        server_hardware_objects = node_creator.list_server_hardware()
-
-        self.assertEqual(2, len(server_hardware_objects))
-
-    @mock.patch.object(facade.Facade, 'get_ironic_node_list')
-    def test_list_pre_allocation_nodes(
-        self, mock_facade, mock_ironic_node_list
-    ):
-        node_migrator = migrate_node_cmd.NodeMigrator(mock_facade)
-        ironic_nodes = POOL_OF_STUB_IRONIC_NODES
-        mock_ironic_node_list.return_value = ironic_nodes
-        mock_facade.get_ironic_node_list = mock_ironic_node_list
-
-        pre_allocation_nodes = node_migrator.list_pre_allocation_nodes()
-
-        self.assertEqual(2, len(list(pre_allocation_nodes)))
-
-    @mock.patch.object(facade.Facade, 'node_update')
-    @mock.patch.object(facade.Facade, 'node_set_maintenance')
-    @mock.patch.object(facade.Facade, 'delete_server_profile')
-    def test_migrate_idle_node(
-        self, mock_delete_server_profile, mock_set_maintenance,
-        mock_node_update, mock_facade
-    ):
-        node_migrator = migrate_node_cmd.NodeMigrator(mock_facade)
-
-        mock_facade.node_set_maintenance = mock_set_maintenance
-        mock_facade.node_update = mock_node_update
-        mock_facade.delete_server_profile = mock_delete_server_profile
-
-        node = POOL_OF_STUB_IRONIC_NODES[0]
-        node.server_profile_uri = \
-            POOL_OF_STUB_SERVER_HARDWARE[0].server_profile_uri
-        patch_test = [{'op': 'add',
-                       'path': '/driver_info/dynamic_allocation',
-                       'value': True}]
-
-        node_migrator.migrate_idle_node(node)
-
-        mock_delete_server_profile.assert_called_with(
-            node.server_profile_uri
-        )
-        mock_node_update.assert_called_with(
-            node.uuid, patch_test
-        )
-        self.assertEqual(2, mock_set_maintenance.call_count)
-
-    @mock.patch.object(facade.Facade, 'node_update')
-    def test_migrate_node_with_instance(self, mock_node_update, mock_facade):
-        node_migrator = migrate_node_cmd.NodeMigrator(mock_facade)
-        mock_facade.node_update = mock_node_update
-
-        node = POOL_OF_STUB_IRONIC_NODES[1]
-        node.server_profile_uri = \
-            POOL_OF_STUB_SERVER_HARDWARE[0].server_profile_uri
-
-        patch_test_dynamic = [{'op': 'add',
-                               'path': '/driver_info/dynamic_allocation',
-                               'value': True}]
-        patch_test_sp_applied = [{'op': 'add',
-                                  'path': '/driver_info/'
-                                          'applied_server_profile_uri',
-                                  'value':
-                                          '1111-2222-3333'}]
-
-        node_migrator.migrate_node_with_instance(node)
-
-        mock_node_update.assert_called_with(
-            node.uuid, patch_test_sp_applied + patch_test_dynamic
-        )
+        self.assertEqual(len(POOL_OF_SERVER_HARDWARE),
+                         len(server_hardware_objects))
 
     def test_get_flavor_from_ironic_node(self, mock_facade):
         mock_facade.get_server_hardware.return_value = (
-            POOL_OF_STUB_SERVER_HARDWARE[0]
+            POOL_OF_SERVER_HARDWARE[0]
         )
         mock_facade.get_server_profile_template.return_value = (
-            POOL_OF_STUB_SERVER_PROFILE_TEMPLATE[0]
+            POOL_OF_SERVER_PROFILE_TEMPLATE[0]
         )
         mock_facade.get_server_hardware_type.return_value = (
-            STUB_SERVER_HARDWARE_TYPE
+            SERVER_HARDWARE_TYPE
         )
         mock_facade.get_enclosure_group.return_value = (
-            STUB_ENCLOSURE_GROUP
+            ENCLOSURE_GROUP
         )
         node = POOL_OF_STUB_IRONIC_NODES[2]
 
         flavor_creator = create_flavor_cmd.FlavorCreator(mock_facade)
         result_flavor = flavor_creator.get_flavor_from_ironic_node(
-            12345, node
+            123, node
         )
 
         flavor = dict()
@@ -369,6 +358,8 @@ class UnitTestIronicOneviewCli(unittest.TestCase):
         self.assertEqual(result_flavor,
                          flavor_objs.Flavor(id=12345, info=flavor))
 
+    def test_get_server_hardware_id_from_node(self, mock_facade):
+        ironic_node = POOL_OF_STUB_IRONIC_NODES[1]
+        sh_id = common.get_server_hardware_id_from_node(ironic_node)
 
-if __name__ == '__main__':
-    unittest.main()
+        self.assertEqual(sh_id, "22222")

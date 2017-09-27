@@ -1,5 +1,5 @@
-# Copyright 2016 Hewlett Packard Enterprise Development LP.
-# Copyright 2016 Universidade Federal de Campina Grande
+# Copyright (2016-2017) Hewlett Packard Enterprise Development LP
+# Copyright (2016-2017) Universidade Federal de Campina Grande
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -27,7 +27,8 @@ class NodeDelete(object):
         nodes = self.facade.get_ironic_node_list()
         try:
             if number:
-                for n in range(number):
+                upper_limit = min(number, len(nodes))
+                for n in range(upper_limit):
                     self.facade.node_delete(nodes[n].uuid)
             else:
                 for node in nodes:
@@ -47,8 +48,7 @@ class NodeDelete(object):
     help='Delete multiple ironic nodes'
 )
 def do_node_delete(args):
-    """Delete nodes in Ironic"""
-
+    """Delete nodes in Ironic."""
     node_delete = NodeDelete(facade.Facade(args))
 
     if args.all:
