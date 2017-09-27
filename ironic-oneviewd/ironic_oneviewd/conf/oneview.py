@@ -1,5 +1,5 @@
-# Copyright 2016 Hewlett Packard Enterprise Development LP.
-# Copyright 2016 Universidade Federal de Campina Grande
+# Copyright (2016-2017) Hewlett Packard Enterprise Development LP
+# Copyright (2016-2017) Universidade Federal de Campina Grande
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -26,36 +26,6 @@ opts = [
     cfg.StrOpt('password',
                secret=True,
                help='OneView password to be used.'),
-    cfg.BoolOpt('allow_insecure_connections',
-                default=False,
-                help='Option to allow insecure connection with OneView.'),
-    cfg.StrOpt('tls_cacert_file',
-               help='(Optional) Path to CA certificate.'),
-    cfg.IntOpt('max_polling_attempts',
-               default=12,
-               help='Max connection retries to check changes on OneView.'),
-    cfg.BoolOpt('enable_periodic_tasks',
-                default=True,
-                help='(Optional) Whether to enable the periodic tasks for '
-                     'OneView driver be aware when OneView hardware resources '
-                     'are taken and released by Ironic or OneView users '
-                     'and proactively manage nodes in clean fail state '
-                     'according to Dynamic Allocation model of hardware '
-                     'resources allocation in OneView.'),
-    cfg.IntOpt('periodic_check_interval',
-               default=300,
-               help='Period (in seconds) for periodic tasks to be '
-                    'executed when enable_periodic_tasks is True.'),
-    cfg.BoolOpt('audit_enabled',
-                default=False,
-                help='(Optional) Enable auditing of OneView API requests.'),
-    cfg.StrOpt('audit_map_file',
-               help='Path to map file for OneView audit cases. '
-                    'Used only when OneView API audit is enabled. '
-                    'See: https://github.com/openstack/python-oneviewclient'),
-    cfg.StrOpt('audit_output_file',
-               help='Path to OneView audit log file. '
-                    'Created only when Oneview API audit is enabled.'),
 ]
 
 

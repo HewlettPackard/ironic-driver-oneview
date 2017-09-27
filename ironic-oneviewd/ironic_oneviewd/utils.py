@@ -1,5 +1,5 @@
-# Copyright 2015 Hewlett-Packard Development Company, L.P.
-# Copyright 2015 Universidade Federal de Campina Grande
+# Copyright (2015-2017) Hewlett Packard Enterprise Development LP
+# Copyright (2015-2017) Universidade Federal de Campina Grande
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -17,17 +17,13 @@
 import six
 
 from ironicclient import client as ironic_client
-
-from oslo_log import log as logging
 from oslo_utils import importutils
 
 from ironic_oneviewd.conf import CONF
 from ironic_oneviewd import exceptions
 from ironic_oneviewd.openstack.common._i18n import _
 
-client = importutils.try_import('oneview_client.client')
-oneview_states = importutils.try_import('oneview_client.states')
-oneview_exceptions = importutils.try_import('oneview_client.exceptions')
+hpclient = importutils.try_import('hpOneView.oneview_client')
 
 REQUIRED_ON_PROPERTIES = {
     'server_hardware_type_uri': _("Server Hardware Type URI Required."),
@@ -40,14 +36,12 @@ REQUIRED_ON_EXTRAS = {
 
 IRONIC_API_VERSION = 1
 
-LOG = logging.getLogger(__name__)
-
 
 def get_ironic_client():
-    """Generates an instance of the Ironic client.
+    """Generate an instance of the Ironic client.
 
     This method creates an instance of the Ironic client using the OpenStack
-    credentials from config file and the imported ironicclient library.
+    credentials from config file and the ironicclient library.
 
     :returns: an instance of the Ironic client
     """
@@ -71,32 +65,21 @@ def get_ironic_client():
         'os_ironic_api_version': '1.22'
     }
 
-    LOG.debug("Using OpenStack credentials specified in the configuration "
-              "file to get Ironic Client")
-
     return ironic_client.get_client(IRONIC_API_VERSION, **daemon_kwargs)
 
 
-def get_oneview_client():
-    """Generates an instance of the OneView client.
+def get_hponeview_client():
+    """Generate an instance of the hpOneView client.
 
-    Generates an instance of the OneView client using the imported
+    Generates an instance of the hpOneView client using the hpOneView
     oneview_client library.
 
     :returns: an instance of the OneView client
     """
-    oneview_client = client.Client(
-        manager_url=CONF.oneview.manager_url,
-        username=CONF.oneview.username,
-        password=CONF.oneview.password,
-        allow_insecure_connections=CONF.oneview.allow_insecure_connections,
-        tls_cacert_file=CONF.oneview.tls_cacert_file,
-        max_polling_attempts=CONF.oneview.max_polling_attempts,
-        audit_enabled=CONF.oneview.audit_enabled,
-        audit_map_file=CONF.oneview.audit_map_file,
-        audit_output_file=CONF.oneview.audit_output_file
-    )
-    return oneview_client
+    return hpclient.OneViewClient(
+        {"ip": CONF.oneview.manager_url,
+         "credentials": {"userName": CONF.oneview.username,
+                         "password": CONF.oneview.password}})
 
 
 def verify_node_properties(node):
@@ -124,7 +107,7 @@ def verify_node_extra(node):
 
 
 def capabilities_to_dict(capabilities):
-    """Parse the capabilities string into a dictionary
+    """Parse the capabilities string into a dictionary.
 
     :param capabilities: the node capabilities as a formatted string
     :raises: InvalidParameterValue if capabilities is not an string or has
@@ -145,22 +128,6 @@ def capabilities_to_dict(capabilities):
                 _("Malformed capabilities value: %s") % capability
             )
     return capabilities_dict
-
-
-def dynamic_allocation_enabled(node):
-    flag = node.driver_info.get('dynamic_allocation')
-    if flag:
-        if str(flag).lower() == 'true':
-            return True
-        elif str(flag).lower() == 'false':
-            return False
-        else:
-            msg = (("Invalid dynamic_allocation parameter value "
-                    "'%(flag)s' in node's %(node_uuid)s driver_info. "
-                    "Valid values are booleans true or false.") %
-                   {"flag": flag, "node_uuid": node.uuid})
-            raise exceptions.InvalidParameterValue(msg)
-    return False
 
 
 def get_node_info_from_node(node):
@@ -198,6 +165,16 @@ def server_profile_template_uri_from_node(node):
         'server_profile_template_uri'
     )
     return node_server_profile_template_uri
+
+
+def get_ilo_access(remote_console):
+    url = remote_console.get('remoteConsoleUrl')
+    url_parse = six.moves.urllib.parse.urlparse(url)
+    [host_ip] = six.moves.urllib.parse.parse_qs(url_parse.netloc).get('addr')
+    [token] = six.moves.urllib.parse.parse_qs(
+        url_parse.netloc).get('sessionkey')
+
+    return host_ip, token
 
 
 def server_hardware_uri_from_node(node):
