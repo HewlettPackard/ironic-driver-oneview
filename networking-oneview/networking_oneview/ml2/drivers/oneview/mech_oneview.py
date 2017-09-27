@@ -1,5 +1,5 @@
-# Copyright 2016 Hewlett Packard Development Company, LP
-# Copyright 2016 Universidade Federal de Campina Grande
+# Copyright (2016-2017) Hewlett Packard Enterprise Development LP.
+# Copyright (2016-2017) Universidade Federal de Campina Grande
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -13,71 +13,53 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from hpOneView.oneview_client import OneViewClient
-from oslo_config import cfg
 from oslo_log import log
 
 from networking_oneview.ml2.drivers.oneview import common
 from networking_oneview.ml2.drivers.oneview.neutron_oneview_client import (
     Client)
 from networking_oneview.ml2.drivers.oneview import synchronization
-from neutron.extensions import portbindings
+try:
+    from neutron_lib.api.definitions import portbindings
+except ImportError:
+    from neutron.extensions import portbindings
 from neutron.plugins.common import constants as p_const
 from neutron.plugins.ml2 import driver_api
 
 LOG = log.getLogger(__name__)
 
-opts = [
-    cfg.StrOpt('oneview_host',
-               help='IP where OneView is available'),
-    cfg.StrOpt('username',
-               help='OneView username to be used'),
-    cfg.StrOpt('password',
-               secret=True,
-               help='OneView password to be used'),
-    cfg.StrOpt('uplinkset_mappings',
-               help='UplinkSets to be used'),
-    cfg.StrOpt('tls_cacert_file',
-               default='',
-               help="TLS File Path"),
-    cfg.StrOpt('flat_net_mappings',
-               help='Flat Networks on Oneview that are managed by Neutron'),
-    cfg.IntOpt('ov_refresh_interval',
-               default=3600,
-               help='Interval between periodic task executions in seconds')
-]
-
-CONF = cfg.CONF
-CONF.register_opts(opts, group='oneview')
-
-
-def get_oneview_client():
-    return OneViewClient({"ip": CONF.oneview.oneview_host,
-                          "credentials": {"userName": CONF.oneview.username,
-                                          "password": CONF.oneview.password}})
-
 
 class OneViewDriver(driver_api.MechanismDriver):
     def initialize(self):
-        self.oneview_client = get_oneview_client()
-        self.uplinkset_mappings = common.load_conf_option_to_dict(
-            CONF.oneview.uplinkset_mappings)
-        self.flat_net_mappings = common.load_conf_option_to_dict(
-            CONF.oneview.flat_net_mappings)
-        self.neutron_oneview_client = Client(self.oneview_client,
-                                             self.uplinkset_mappings,
-                                             self.flat_net_mappings)
-        if CONF.oneview.tls_cacert_file.strip():
-            self.oneview_client.connection.set_trusted_ssl_bundle(
-                CONF.oneview.tls_cacert_file
-            )
-        sync = synchronization.Synchronization(self.oneview_client,
-                                               self.neutron_oneview_client,
-                                               CONF.database.connection,
-                                               self.uplinkset_mappings,
-                                               self.flat_net_mappings)
-        sync.start()
+        self.oneview_client = common.get_oneview_client()
 
+        self.uplinkset_mappings = common.load_conf_option_to_dict(
+            common.CONF.oneview.uplinkset_mappings)
+        self.flat_net_mappings = common.load_conf_option_to_dict(
+            common.CONF.oneview.flat_net_mappings)
+        self.neutron_oneview_client = Client(
+            self.oneview_client,
+            self.uplinkset_mappings,
+            self.flat_net_mappings
+        )
+        if common.CONF.oneview.tls_cacert_file.strip():
+            self.oneview_client.connection.set_trusted_ssl_bundle(
+                common.CONF.oneview.tls_cacert_file
+            )
+        if not common.CONF.oneview.developer_mode:
+            sync = synchronization.Synchronization(
+                self.oneview_client, self.neutron_oneview_client,
+                common.CONF.database.connection,
+                self.uplinkset_mappings, self.flat_net_mappings
+            )
+            sync.start()
+            LOG.debug("OneView synchronization tool was initialized.")
+        else:
+            LOG.warning(
+                "OneView synchronization tool will "
+                "not be initialized due developer_mode.")
+
+    @common.oneview_reauth
     def bind_port(self, context):
         """Bind baremetal port to a network."""
         session = common.session_from_context(context)
@@ -107,21 +89,25 @@ class OneViewDriver(driver_api.MechanismDriver):
                 }
             )
 
+    @common.oneview_reauth
     def create_network_postcommit(self, context):
         session = common.session_from_context(context)
         network_dict = common.network_from_context(context)
 
         self.neutron_oneview_client.network.create(session, network_dict)
 
+    @common.oneview_reauth
     def delete_network_postcommit(self, context):
         session = common.session_from_context(context)
         network_dict = common.network_from_context(context)
 
         self.neutron_oneview_client.network.delete(session, network_dict)
 
+    @common.oneview_reauth
     def create_port_postcommit(self, context):
         pass
 
+    @common.oneview_reauth
     def delete_port_postcommit(self, context):
         session = common.session_from_context(context)
         port_dict = common.port_from_context(context)

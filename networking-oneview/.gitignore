@@ -46,6 +46,7 @@ output/*/index.html
 doc/build
 
 # pbr generates these
+AUTHORS
 ChangeLog
 
 # Editors

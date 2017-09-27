@@ -58,8 +58,8 @@ These mappings configuration can be made in the configuration file using the
 "uplinkset_mappings" and "flat_net_mappings" attributes, as follows:
 
 - "uplinkset_mappings" are used to define which provider networks from Neutron should be controlled by the OneView Mechanism Driver.
-  The administrator defines comma-separated triples of [Provider_Network:Logical_Interconnect_Group_UUID:Uplink_Set_name]
-  to represent each desired mapping of a Neutron network to the Logical Interconnect Group's Uplink Set in which it will
+  The administrator defines comma-separated triples of [Provider_Network:Logical_Interconnect_Group_UUID:Uplink_Set_name] 
+  to represent each desired mapping of a Neutron network to the Logical Interconnect Group's Uplink Set in which it will 
   be created in OneView. These mappings can be related to two types of Uplink Sets: “Ethernet” Uplink Sets to support VLAN
   networks or “Untagged” Uplink Sets to support flat network. In the former, OneView does not allow more than one network
   to use the same VLAN ID in the same Uplink Set and only one mapping is allowed per Logical Interconnect. In the latter,
@@ -165,7 +165,7 @@ Install using DevStack
 ======================
 
 1. Install with PIP:
-
+ 
 - Requirement: Python => 2.7.9
 
 - To install the OneView Mechanism Driver, run:

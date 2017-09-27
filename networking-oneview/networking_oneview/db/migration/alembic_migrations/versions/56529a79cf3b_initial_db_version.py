@@ -1,4 +1,5 @@
-# Copyright 2016 OpenStack Foundation
+# Copyright (2016-2017) Hewlett Packard Enterprise Development LP.
+# Copyright (2016-2017) Universidade Federal de Campina Grande
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -13,7 +14,7 @@
 #    under the License.
 #
 
-"""initial db version
+"""initial db version.
 
 Revision ID: 56529a79cf3b
 Revises: abd1dbdb47a5

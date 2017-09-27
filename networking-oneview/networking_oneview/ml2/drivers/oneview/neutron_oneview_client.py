@@ -1,5 +1,5 @@
-# Copyright 2016 Hewlett Packard Development Company, LP
-# Copyright 2016 Universidade Federal de Campina Grande
+# Copyright (2016-2017) Hewlett Packard Enterprise Development LP.
+# Copyright (2016-2017) Universidade Federal de Campina Grande
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -20,7 +20,7 @@ import time
 from hpOneView import exceptions
 from oslo_log import log
 from oslo_utils import strutils
-from oslo_serialization import jsonutils
+
 from networking_oneview.ml2.drivers.oneview import (
     database_manager as db_manager)
 from networking_oneview.ml2.drivers.oneview import common
@@ -57,53 +57,47 @@ class ResourceManager(object):
 
         return False
 
-    def check_server_hardware_availability(self, server_hardware_id):
+    def check_server_hardware_availability(self, server_hardware):
         while True:
-            if not self.get_server_hardware_power_lock_state(
-                    server_hardware_id):
+            if not server_hardware.get('powerLock'):
                 return True
             time.sleep(30)
 
-    def get_server_hardware_power_lock_state(self, server_hardware_id):
-        server_hardware_dict = self.oneview_client.server_hardware.get(
-            server_hardware_id
-        )
-        return server_hardware_dict.get('powerLock')
-
-    def check_server_profile_availability(self, server_hardware_id):
+    def check_server_profile_availability(self, server_hardware):
         while True:
-            if self.get_server_profile_state(server_hardware_id):
+            if self.get_server_profile_state(server_hardware):
                 return True
             time.sleep(5)
 
-    def get_server_profile_state(self, server_hardware_id):
+    def get_server_profile_state(self, server_hardware):
         server_profile_dict = self.server_profile_from_server_hardware(
-            server_hardware_id
+            server_hardware
         )
         return server_profile_dict.get('status')
 
-    def get_server_hardware_power_state(self, server_hardware_id):
-        server_hardware_dict = self.oneview_client.server_hardware.get(
-            server_hardware_id
+    def get_server_hardware_power_state(self, server_hardware):
+        return server_hardware.get('powerState')
+
+    def update_server_hardware_power_state(self, server_hardware, state):
+        configuration = {
+            "powerState": state,
+            "powerControl": "MomentaryPress"
+        }
+        server_hardware_id = server_hardware.get('uuid')
+
+        self.oneview_client.server_hardware.update_power_state(
+            configuration, server_hardware_id
         )
-        return server_hardware_dict.get('powerState')
 
-    def update_server_hardware_power_state(self, server_hardware_id, state):
-            configuration = {
-                "powerState": state,
-                "powerControl": "MomentaryPress"
-            }
-
-            self.oneview_client.server_hardware.update_power_state(
-                configuration, server_hardware_id
-            )
-
-    def server_profile_from_server_hardware(self, server_hardware_id):
-        server_hardware = self.oneview_client.server_hardware.get(
-            server_hardware_id
-        )
+    def server_profile_from_server_hardware(self, server_hardware):
         server_profile_uri = server_hardware.get('serverProfileUri')
-        return self.oneview_client.server_profiles.get(server_profile_uri)
+        if(server_profile_uri):
+            LOG.info(
+                "There is Server Profile %s available.", server_profile_uri)
+            return self.oneview_client.server_profiles.get(
+                server_profile_uri)
+        else:
+            LOG.info("There is no Server Profile available.")
 
 
 class Network(ResourceManager):
@@ -132,6 +126,7 @@ class Network(ResourceManager):
             return
 
         mappings = []
+        oneview_network_id = None
         if mapping_type == common.UPLINKSET_MAPPINGS_TYPE:
             network_type = 'tagged' if network_seg_id else 'untagged'
             oneview_network = self._create_network_on_oneview(
@@ -148,6 +143,8 @@ class Network(ResourceManager):
         db_manager.map_neutron_network_to_oneview(
             session, network_id, oneview_network_id,
             mapping_type == common.UPLINKSET_MAPPINGS_TYPE, mappings)
+
+        LOG.info("Network %s created.", network_id)
 
     def _get_network_mapping_type(self, physical_network, network_type):
         physnet_in_uplinkset_mapping = self._is_physnet_in_uplinkset_mapping(
@@ -250,6 +247,7 @@ class Network(ResourceManager):
         db_manager.delete_oneview_network_lig(
             session, oneview_network_id=oneview_network_id
         )
+        LOG.info("Network %s deleted", oneview_network_id)
 
     def update_network_lig(
         self, session, oneview_network_id, network_type, physical_network
@@ -300,7 +298,7 @@ class Network(ResourceManager):
     def _add_to_ligs(self, network_type, physical_network, oneview_network):
         lig_list = self._get_lig_list(physical_network, network_type)
         if not lig_list:
-            return None
+            return
         uplinksets_list = self._get_uplinksets_from_lig(
             network_type, lig_list)
         self._add_network_to_logical_interconnect_group(
@@ -362,12 +360,15 @@ class Network(ResourceManager):
 class Port(ResourceManager):
     def create(self, session, port_dict):
         network_id = port_dict.get('network_id')
+        neutron_port_id = port_dict.get('id')
 
         network_segment = db_manager.get_network_segment(session, network_id)
         physical_network = network_segment.get('physical_network')
         network_type = network_segment.get('network_type')
 
         if not self.is_uplinkset_mapping(physical_network, network_type):
+            LOG.warning(
+                "Port %s is not mapping in OneView conf", network_id)
             return
 
         local_link_information_list = common.local_link_information_from_port(
@@ -377,7 +378,9 @@ class Port(ResourceManager):
         if not self._is_port_valid_to_reflect_on_oneview(
             session, port_dict, local_link_information_list
         ):
-            LOG.info("Port not valid to reflect on OneView.")
+            LOG.warning(
+                "Port %s is not valid to reflect on OneView.", neutron_port_id
+            )
             return
 
         neutron_oneview_network = db_manager.get_neutron_oneview_network(
@@ -386,37 +389,40 @@ class Port(ResourceManager):
             neutron_oneview_network.oneview_network_id)
         switch_info = common.switch_info_from_local_link_information_list(
             local_link_information_list)
-        server_hardware_id = (
-            common.server_hardware_id_from_local_link_information_list(
-                local_link_information_list))
+        server_hardware = (
+            common.server_hardware_from_local_link_information_list(
+                self.oneview_client, local_link_information_list))
         server_profile = self.server_profile_from_server_hardware(
-            server_hardware_id
+            server_hardware
         )
+        if server_profile:
+            LOG.info("There is Server Profile %s available.", server_profile)
+            bootable = switch_info.get('bootable')
+            mac_address = port_dict.get('mac_address')
 
-        bootable = switch_info.get('bootable')
-        boot_priority = self._get_boot_priority(server_profile, bootable)
+            if common.is_rack_server(server_hardware):
+                LOG.info("The server %s is a rack server.", server_hardware)
+                return
 
-        mac_address = port_dict.get('mac_address')
-        port_id = self._port_id_from_mac(server_hardware_id, mac_address)
+            port_id = self._port_id_from_mac(server_hardware, mac_address)
+            connections = server_profile.get('connections')
+            existing_connections = [connection for connection in connections
+                                    if connection.get('portId') == port_id]
+            for connection in existing_connections:
+                if connection.get('mac').upper() == mac_address.upper():
+                    server_profile['connections'].remove(connection)
+            boot_priority = self._get_boot_priority(server_profile, bootable)
+            server_profile['connections'].append({
+                'name': "NeutronPort[" + mac_address + "]",
+                'portId': port_id,
+                'networkUri': network_uri,
+                'boot': {'priority': boot_priority},
+                'functionType': 'Ethernet'
+            })
 
-        connections = server_profile.get('connections')
-        existing_connections = [connection for connection in connections
-                                if connection.get('portId') == port_id]
-
-        for connection in existing_connections:
-            if connection.get('mac').upper() == mac_address.upper():
-                server_profile['connections'].remove(connection)
-
-        server_profile['connections'].append({
-            'name': "NeutronPort[" + mac_address + "]",
-            'portId': port_id,
-            'networkUri': network_uri,
-            'boot': {'priority': boot_priority},
-            'functionType': 'Ethernet'
-        })
-
-        self._check_oneview_entities_availability(server_hardware_id)
-        self._update_oneview_entities(server_hardware_id, server_profile)
+            self._check_oneview_entities_availability(server_hardware)
+            self._update_oneview_entities(server_hardware, server_profile)
+            LOG.info("The requested connection %s was created.", port_id)
 
     def _get_boot_priority(self, server_profile, bootable):
         if bootable:
@@ -433,8 +439,8 @@ class Port(ResourceManager):
                 return False
         return True
 
-    def _port_id_from_mac(self, server_hardware_id, mac_address):
-        port_info = self._get_port_info(server_hardware_id, mac_address)
+    def _port_id_from_mac(self, server_hardware, mac_address):
+        port_info = self._get_port_info(server_hardware, mac_address)
 
         return (
             str(port_info.get('device_slot_location')) + " " +
@@ -443,10 +449,7 @@ class Port(ResourceManager):
             str(port_info.get('virtual_port_function'))
         )
 
-    def _get_port_info(self, server_hardware_id, mac_address):
-        server_hardware = self.oneview_client.server_hardware.get(
-            server_hardware_id
-        )
+    def _get_port_info(self, server_hardware, mac_address):
         port_map = server_hardware.get('portMap')
         device_slots = port_map.get('deviceSlots')
 
@@ -476,28 +479,37 @@ class Port(ResourceManager):
         local_link_information_list = common.local_link_information_from_port(
             port_dict
         )
+        neutron_port_id = port_dict.get('id')
+
         if not self._is_port_valid_to_reflect_on_oneview(
             session, port_dict, local_link_information_list
         ):
-            LOG.info("Port not valid to reflect on OneView.")
+            LOG.warning(
+                "Port %s is not valid to reflect on OneView.", neutron_port_id
+            )
             return
 
-        server_hardware_id = (
-            common.server_hardware_id_from_local_link_information_list(
-                local_link_information_list))
+        server_hardware = (
+            common.server_hardware_from_local_link_information_list(
+                self.oneview_client, local_link_information_list))
         server_profile = self.server_profile_from_server_hardware(
-            server_hardware_id
+            server_hardware
         )
+        if server_profile:
+            LOG.info("There is Server Profile %s available.", server_profile)
+            mac_address = port_dict.get('mac_address')
+            connection = self._connection_with_mac_address(
+                server_profile.get('connections'), mac_address
+            )
+            if connection:
+                LOG.debug("There is Connection %s available.", connection)
+                server_profile.get('connections').remove(connection)
+            else:
+                LOG.debug("There is no Connection available.")
 
-        mac_address = port_dict.get('mac_address')
-        connection = self._connection_with_mac_address(
-            server_profile.get('connections'), mac_address
-        )
-        if connection:
-            server_profile.get('connections').remove(connection)
-
-        self._check_oneview_entities_availability(server_hardware_id)
-        self._update_oneview_entities(server_hardware_id, server_profile)
+            self._check_oneview_entities_availability(server_hardware)
+            self._update_oneview_entities(server_hardware, server_profile)
+            LOG.info("The requested port was deleted successfully.")
 
     def _connection_with_mac_address(self, connections, mac_address):
         for connection in connections:
@@ -524,9 +536,11 @@ class Port(ResourceManager):
                     "'local_link_information' must contain 'switch_info'.")
                 return False
 
-            server_hardware_id = (
-                common.server_hardware_id_from_local_link_information_list(
-                    local_link_information_list))
+            server_hardware = (
+                common.server_hardware_from_local_link_information_list(
+                    self.oneview_client, local_link_information_list))
+            server_hardware_id = server_hardware.get('uuid')
+
             if strutils.is_valid_boolstr(switch_info.get('bootable')):
                 bootable = strutils.bool_from_string(
                     switch_info.get('bootable'))
@@ -557,71 +571,66 @@ class Port(ResourceManager):
             return False
         return is_local_link_information_valid(local_link_information_list)
 
-    def _check_oneview_entities_availability(self, server_hardware_id):
-        self.check_server_profile_availability(server_hardware_id)
-        self.check_server_hardware_availability(server_hardware_id)
+    def _check_oneview_entities_availability(self, server_hardware):
+        self.check_server_profile_availability(server_hardware)
+        self.check_server_hardware_availability(server_hardware)
 
-    def _update_oneview_entities(self, server_hardware_id, server_profile):
+    def _update_oneview_entities(self, server_hardware, server_profile):
         previous_power_state = self.get_server_hardware_power_state(
-            server_hardware_id
+            server_hardware
         )
         self.update_server_hardware_power_state(
-            server_hardware_id, "Off"
+            server_hardware, "Off"
         )
         self.oneview_client.server_profiles.update(
             resource=server_profile,
             id_or_uri=server_profile.get('uri')
         )
         self.update_server_hardware_power_state(
-            server_hardware_id, previous_power_state
+            server_hardware, previous_power_state
         )
 
 
 class Client(object):
-    def __init__(
-        self, oneview_client, uplinkset_mappings,
-        flat_net_mappings
-    ):
-        uplinkset_mappings = self._uplinkset_mappings_by_type(
-            oneview_client, uplinkset_mappings
+    def __init__(self, oneview_client, uplinkset_mappings, flat_net_mappings):
+        self.oneview_client = oneview_client
+        self.uplinkset_mappings = self._uplinkset_mappings_by_type(
+            uplinkset_mappings
         )
         self.network = Network(
-            oneview_client, uplinkset_mappings, flat_net_mappings
+            self.oneview_client, self.uplinkset_mappings, flat_net_mappings
         )
         self.port = Port(
-            oneview_client, uplinkset_mappings, flat_net_mappings
+            self.oneview_client, self.uplinkset_mappings, flat_net_mappings
         )
 
-    def _uplinkset_mappings_by_type(
-        self, oneview_client, uplinkset_mappings
-    ):
+    def _uplinkset_mappings_by_type(self, uplinkset_mappings):
         uplinkset_mappings_by_type = {}
 
         uplinkset_mappings_by_type[common.NETWORK_TYPE_TAGGED] = (
             self._get_uplinkset_by_type(
-                oneview_client, uplinkset_mappings, common.NETWORK_TYPE_TAGGED
+                uplinkset_mappings,
+                common.NETWORK_TYPE_TAGGED
             )
         )
 
         uplinkset_mappings_by_type[common.NETWORK_TYPE_UNTAGGED] = (
             self._get_uplinkset_by_type(
-                oneview_client, uplinkset_mappings,
+                uplinkset_mappings,
                 common.NETWORK_TYPE_UNTAGGED
             )
         )
 
         return uplinkset_mappings_by_type
 
-    def _get_uplinkset_by_type(
-        self, oneview_client, uplinkset_mappings, net_type
-    ):
+    def _get_uplinkset_by_type(self, uplinkset_mappings, net_type):
         uplinksets_by_type = {}
 
         for physnet in uplinkset_mappings:
             provider = uplinkset_mappings.get(physnet)
             for lig_id, uplinkset_name in zip(provider[0::2], provider[1::2]):
                 lig = common.get_logical_interconnect_group_by_id(
-                    oneview_client, lig_id)
+                    self.oneview_client, lig_id)
                 lig_uplinksets = lig.get('uplinkSets')
 
                 uplinkset = common.get_uplinkset_by_name_from_list(

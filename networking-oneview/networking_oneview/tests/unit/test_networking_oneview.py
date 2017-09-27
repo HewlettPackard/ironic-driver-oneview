@@ -1,5 +1,6 @@
-# Copyright (2016-2017) Hewlett Packard Enterprise Development LP.
-# Copyright (2016-2017) Universidade Federal de Campina Grande
+# Copyright 2017 Hewlett Packard Enterprise Development LP.
+# Copyright 2017 Universidade Federal de Campina Grande
+# All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -13,9 +14,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import unittest
 
-def get_network_from_port_context(context):
-    network_context_dict = context._network_context
-    if network_context_dict is None:
-        return None
-    return network_context_dict._network
+
+class NetworkingOneViewTestCase(unittest.TestCase):
+    def test_pass(self):
+        pass
