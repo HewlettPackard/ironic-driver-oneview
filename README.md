@@ -1,14 +1,28 @@
 # HPE OneView drivers and tools for OpenStack
 
-While virtualization is the use case for the average end user, it does not apply for all types of workloads. Some applications cannot be executed in virtual machines due to performance constraints (e.g. database hosting), hardware constraints (i.e. depending on hardware that cannot be virtualized), also due to security and isolation reasons, or even deploying cloud nodes for provisioning virtual machines or containers (new use case being adopted). In order to bring bare metal to Cloud with HPE OneView, we have developed integrations with OpenStack Ironic and Neutron. With our solution, we can provision HPE OneView bare metal servers using end user tenant networks in OpenStack in the same way as virtual machines.
+While virtualization is the use case for the average end user, it does not apply for all types of workloads. Some applications cannot be executed in virtual machines due to performance constraints (e.g. database hosting), hardware constraints (i.e. depending on hardware that cannot be virtualized), also due to security and isolation reasons, or even deploying cloud nodes for provisioning virtual machines or containers (new use case being adopted). 
 
-OneView’s Server Hardware are enrolled as OpenStack Ironic nodes, based on a given Server Profile Template previously created. Thus, the OneView drivers, unlike others, can help cloud administrators manage firmware/driver dependencies between the hardware they provision and the operating system images they make use of. The drivers work in a shared allocation fashion with other HPE OneView users, which means nodes enrolled to OpenStack Ironic are not statically allocated at OneView. OneView drivers’ periodic tasks take care of marking nodes claimed by OneView users as unavailable to OpenStack users and vice versa.
+[HPE OneView](https://www.hpe.com/us/en/integrated-systems/software.html) is an infrastructure management tool that allows IT teams to deploy, monitor and manage their HPE data center infrastructure and is the foundation of HPE’s drive to Composable Infrastructure. HPE OneView is built with software intelligence and provides a unified API that allows to automate the infrastructure deployment and updates and manage facilities. 
+
+In order to bring bare metal to Cloud with HPE OneView, we have developed integrations with OpenStack Ironic and Neutron. With our solution, we can provision HPE OneView bare metal servers using end user tenant networks in OpenStack in the same way as virtual machines.
+
+In the OpenStack ecosystem, the component responsible for provisioning bare metal machines is named Ironic. In the most basic scenario, Ironic achieves this goal communicating with other three main OpenStack components:
+
+1. "Nova" - compute service; 
+1. "Glance" - image service; and 
+1. "Neutron" - networking service.
+
+The integration of management systems, such as HPE OneView, is made possible in
+Ironic through the implementation of drivers. This way, OneView drivers implement well defined interfaces in Ironic and uses OneView RESTful API to execute actions that will be performed in the physical machines (e.g. powering machine on/off and rebooting; changing boot device; and when creating and removing a *Server Profile*.)
 
 # Projects
 
 ## Bare metal Drivers
 
 The HPE OneView drivers for OpenStack Ironic, already incorporated in the OpenStack mainstream codebase, allow cloud providers to use their OneView managed hardware as bare metal instances. Please refer to [OpenStack Ironic documentation for OneView drivers]( https://docs.openstack.org/ironic/latest/admin/drivers/oneview.html)
+
+OneView’s Server Hardware are enrolled as OpenStack Ironic nodes, based on a given Server Profile Template previously created. Thus, the OneView drivers, unlike others, can help cloud administrators manage firmware/driver dependencies between the hardware they provision and the operating system images they make use of. The drivers work in a shared allocation fashion with other HPE OneView users, which means nodes enrolled to OpenStack Ironic are not statically allocated at OneView. OneView drivers’ periodic tasks take care of marking nodes claimed by OneView users as unavailable to OpenStack users and vice versa.
+
 
 ## Ironic OneView CLI
 
