@@ -23,6 +23,10 @@ The HPE OneView drivers for OpenStack Ironic, already incorporated in the OpenSt
 
 OneView’s Server Hardware are enrolled as OpenStack Ironic nodes, based on a given Server Profile Template previously created. Thus, the OneView drivers, unlike others, can help cloud administrators manage firmware/driver dependencies between the hardware they provision and the operating system images they make use of. The drivers work in a shared allocation fashion with other HPE OneView users, which means nodes enrolled to OpenStack Ironic are not statically allocated at OneView. OneView drivers’ periodic tasks take care of marking nodes claimed by OneView users as unavailable to OpenStack users and vice versa.
 
+### Known Bugs
+
+A list of known bugs (and proposed fixes) for OpenStack Newton is available [here](../../wiki/Known-Bugs)
+
 
 ## Ironic OneView CLI
 
