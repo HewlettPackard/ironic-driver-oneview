@@ -1,4 +1,0 @@
-os-testr>=0.8.0 # Apache-2.0
-flake8==2.4.1
-pytest-cov
-mock>=2.0 # BSD
