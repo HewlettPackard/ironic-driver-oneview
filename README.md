@@ -31,7 +31,7 @@ A tool that helps administrators manage their compute nodes. Automating the proc
 
 ## Network ML2 Driver
 
-The HPE OneView ML2 driver allows cloud providers to manage their networking hardware. Reflecting networking operations performed on OpenStack Neutron to OneView being responsible for automatically creating and deleting networks, configuring Logical Interconnect Groups, its associated Logical Interconnects and UpLink sets, and updating connections on the Server Profile applied to Server Hardware. We have been preparing the HPE OneView Mechanism Driver to be moved from GitHub to OpenStack codebase, meanwhile refer to [networking-oneview](networking-oneview).
+The HPE OneView ML2 driver allows cloud providers to manage their networking hardware. Reflecting networking operations performed on OpenStack Neutron to OneView being responsible for automatically creating and deleting networks, configuring Logical Interconnect Groups, its associated Logical Interconnects and UpLink sets, and updating connections on the Server Profile applied to Server Hardware. For more information, Please refer to [networking-oneview](https://github.com/HewlettPackard/networking-oneview).
 
 # Contributing
 
